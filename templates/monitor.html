@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}实时监控{% endblock %}
+{% block content %}
+<h2 class="mb-3">实时监控中心</h2>
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="video-panel card p-3">
+      <div class="d-flex gap-2 flex-wrap mb-3">
+        <button class="btn btn-primary" id="openCameraBtn">打开摄像头</button>
+        <button class="btn btn-outline-secondary" id="closeCameraBtn">关闭摄像头</button>
+        <button class="btn btn-success" id="startDetBtn">开始目标检测</button>
+        <button class="btn btn-outline-danger" id="stopDetBtn">停止目标检测</button>
+        <button class="btn btn-dark" id="fullscreenBtn">全屏显示</button>
+      </div>
+      <div class="video-wrap" id="videoWrap">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="overlay"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card p-3 h-100">
+      <h5>实时统计</h5>
+      <ul class="list-group" id="countList"></ul>
+      <div class="mt-3 text-muted small" id="statusText">状态：待机</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/monitor.js') }}"></script>
+{% endblock %}

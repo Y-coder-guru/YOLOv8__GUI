@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block title %}数据统计{% endblock %}
+{% block content %}
+<h2 class="mb-3">数据统计与动态图表</h2>
+<div class="row g-3 mb-3">
+  <div class="col-md-3"><div class="card p-3"><div>今日检测事件</div><h4 id="cardEvents">0</h4></div></div>
+  <div class="col-md-3"><div class="card p-3"><div>今日检测目标</div><h4 id="cardObjects">0</h4></div></div>
+  <div class="col-md-3"><div class="card p-3"><div>在线用户数</div><h4 id="cardUsers">0</h4></div></div>
+  <div class="col-md-3"><div class="card p-3"><div>摄像头状态</div><h4 id="cardCamera">关闭</h4></div></div>
+</div>
+<div class="row g-3">
+  <div class="col-lg-6"><div class="card p-3"><h6>实时数量折线图</h6><canvas id="lineChart"></canvas></div></div>
+  <div class="col-lg-6"><div class="card p-3"><h6>类别占比饼图</h6><canvas id="pieChart"></canvas></div></div>
+  <div class="col-12"><div class="card p-3"><h6>时段统计柱状图</h6><canvas id="barChart"></canvas></div></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/stats.js') }}"></script>
+{% endblock %}

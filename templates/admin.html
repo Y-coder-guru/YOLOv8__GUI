@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}管理员{% endblock %}
+{% block content %}
+<h2 class="mb-3">管理员后台</h2>
+<div class="row g-3 mb-3">
+  <div class="col-md-3"><div class="card p-3"><div>用户总数</div><h4 id="mUser">0</h4></div></div>
+  <div class="col-md-3"><div class="card p-3"><div>历史总量</div><h4 id="mHistory">0</h4></div></div>
+  <div class="col-md-3"><div class="card p-3"><div>摄像头</div><h4 id="mCamera">关闭</h4></div></div>
+  <div class="col-md-3"><div class="card p-3"><div>今日日志量</div><h4 id="mLogs">0</h4></div></div>
+</div>
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card p-3 h-100">
+      <h5>用户列表</h5>
+      <ul class="list-group" id="userList"></ul>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card p-3 h-100">
+      <h5>系统日志</h5>
+      <ul class="list-group" id="logList"></ul>
+    </div>
+  </div>
+</div>
+<div class="card p-3 mt-3">
+  <h5>历史记录管理（删除）</h5>
+  <div class="input-group mb-2"><input class="form-control" id="deleteId" placeholder="输入记录 ID"><button class="btn btn-danger" id="deleteBtn">删除记录</button></div>
+  <small class="text-muted">删除后不可恢复。</small>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% endblock %}
