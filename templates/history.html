@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}历史记录{% endblock %}
+{% block content %}
+<h2 class="mb-3">历史检测记录</h2>
+<div class="card p-3 mb-3">
+  <div class="row g-2">
+    <div class="col-md-3"><input class="form-control" id="keyword" placeholder="关键词（类别）"></div>
+    <div class="col-md-2"><input class="form-control" id="category" placeholder="精确类别"></div>
+    <div class="col-md-2"><input class="form-control" id="startTime" type="datetime-local"></div>
+    <div class="col-md-2"><input class="form-control" id="endTime" type="datetime-local"></div>
+    <div class="col-md-2"><button class="btn btn-primary w-100" id="searchBtn">搜索筛选</button></div>
+    <div class="col-md-1"><button class="btn btn-outline-secondary w-100" id="resetBtn">重置</button></div>
+  </div>
+</div>
+<div class="card p-3 table-responsive">
+  <table class="table table-striped" id="historyTable">
+    <thead><tr><th>ID</th><th>时间</th><th>类别</th><th>数量</th><th>置信度</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <div class="d-flex justify-content-between align-items-center mt-2">
+    <small class="text-muted" id="pageInfo">共 0 条</small>
+    <div class="btn-group">
+      <button class="btn btn-sm btn-outline-primary" id="prevPage">上一页</button>
+      <button class="btn btn-sm btn-outline-primary" id="nextPage">下一页</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/history.js') }}"></script>
+{% endblock %}
