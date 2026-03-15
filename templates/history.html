@@ -4,7 +4,12 @@
 <h2 class="mb-3">历史检测记录</h2>
 <div class="card p-3 mb-3">
   <div class="row g-2 align-items-end history-filter-row">
-
+    <div class="col-xl-2 col-md-4"><label class="form-label">关键词</label><input class="form-control" id="keyword" placeholder="类别/备注"></div>
+    <div class="col-xl-2 col-md-4"><label class="form-label">类别</label><input class="form-control" id="category" placeholder="如 person"></div>
+    <div class="col-xl-2 col-md-4"><label class="form-label">状态</label><input class="form-control" id="status" placeholder="如 目标检测"></div>
+    <div class="col-xl-2 col-md-4"><label class="form-label">开始时间</label><input class="form-control" type="datetime-local" step="1" id="startTime"></div>
+    <div class="col-xl-2 col-md-4"><label class="form-label">结束时间</label><input class="form-control" type="datetime-local" step="1" id="endTime"></div>
+    <div class="col-xl-2 col-md-8 d-flex gap-2 flex-wrap history-actions">
       <button class="btn btn-primary uniform-btn" id="searchBtn">筛选</button>
       <button class="btn btn-outline-secondary uniform-btn" id="resetBtn">重置筛选</button>
       <button class="btn btn-outline-secondary uniform-btn" id="exportCsvBtn">导出 CSV</button>
