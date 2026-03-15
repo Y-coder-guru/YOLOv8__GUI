@@ -11,16 +11,14 @@
 <div class="d-flex" id="layoutWrapper">
   {% if current_user.is_authenticated %}
   <aside class="sidebar p-3 page-transition" id="appSidebar">
-    <div class="sidebar-header mb-2">
-      <h4 class="mb-0 sidebar-brand">YOLOv8 GUI</h4>
-    </div>
-    <a href="{{ url_for('monitor') }}" class="nav-link {% if request.path.startswith('/monitor') %}active{% endif %}"><span class="menu-icon">📹</span><span class="menu-text">实时监控</span></a>
-    <a href="{{ url_for('stats_page') }}" class="nav-link {% if request.path.startswith('/stats') %}active{% endif %}"><span class="menu-icon">📊</span><span class="menu-text">数据统计</span></a>
-    <a href="{{ url_for('history_page') }}" class="nav-link {% if request.path.startswith('/history') %}active{% endif %}"><span class="menu-icon">🕘</span><span class="menu-text">检测记录</span></a>
+    <h4 class="mb-4 sidebar-brand">YOLOv8 GUI</h4>
+    <a href="{{ url_for('monitor') }}" class="nav-link {% if request.path.startswith('/monitor') %}active{% endif %}">实时监控</a>
+    <a href="{{ url_for('stats_page') }}" class="nav-link {% if request.path.startswith('/stats') %}active{% endif %}">数据统计</a>
+    <a href="{{ url_for('history_page') }}" class="nav-link {% if request.path.startswith('/history') %}active{% endif %}">检测记录</a>
     {% if current_user.is_admin %}
-    <a href="{{ url_for('admin_page') }}" class="nav-link {% if request.path.startswith('/admin') %}active{% endif %}"><span class="menu-icon">⚙️</span><span class="menu-text">系统设置</span></a>
+    <a href="{{ url_for('admin_page') }}" class="nav-link {% if request.path.startswith('/admin') %}active{% endif %}">系统设置</a>
     {% endif %}
-    <a href="{{ url_for('profile_page') }}" class="nav-link {% if request.path.startswith('/profile') %}active{% endif %}"><span class="menu-icon">👤</span><span class="menu-text">个人账户</span></a>
+    <a href="{{ url_for('profile_page') }}" class="nav-link {% if request.path.startswith('/profile') %}active{% endif %}">个人账户</a>
 
     <div class="sidebar-footer mt-auto pt-3">
       <div>版本：v1.2.0</div>
@@ -29,7 +27,6 @@
     </div>
   </aside>
   {% endif %}
-  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
   <main class="flex-grow-1 p-3 p-md-4 main-content page-transition" id="mainContent">
     {% if not current_user.is_authenticated %}
@@ -39,17 +36,17 @@
     </div>
     {% endif %}
     {% if current_user.is_authenticated %}
-    <button class="btn btn-sm btn-outline-secondary sidebar-floating-toggle" id="sidebarToggleBtn" title="折叠侧边栏" aria-label="折叠侧边栏">☰</button>
     <div class="topbar-meta mb-3">
       <div class="d-flex align-items-center gap-2 topbar-left">
+        <button class="btn btn-sm btn-outline-secondary" id="sidebarToggleBtn" title="折叠侧边栏">☰</button>
         <span class="badge text-bg-dark" id="globalCameraStatus">摄像头状态：未连接</span>
       </div>
       <div class="d-flex align-items-center justify-content-center topbar-center">
         <span class="badge text-bg-light" id="bjClock">--</span>
       </div>
       <div class="d-flex align-items-center gap-2 topbar-right">
-        <img id="globalAvatar" class="topbar-avatar" src="{{ current_user.avatar_url or "" }}" alt="用户头像">
-        <span id="globalUserName" class="small fw-semibold text-secondary">{{ current_user.username }}</span>
+        <img id="globalAvatar" class="topbar-avatar" alt="用户头像">
+        <span id="globalUserName" class="small fw-semibold text-secondary">当前用户</span>
       </div>
     </div>
     {% endif %}
@@ -157,28 +154,8 @@ function startBjClock() {
 function initSidebarToggle() {
   const btn = document.getElementById('sidebarToggleBtn');
   const wrapper = document.getElementById('layoutWrapper');
-  const backdrop = document.getElementById('sidebarBackdrop');
-  const navLinks = document.querySelectorAll('#appSidebar .nav-link');
   if (!btn || !wrapper) return;
-
-  btn.onclick = () => {
-    if (window.innerWidth <= 768) {
-      wrapper.classList.toggle('sidebar-mobile-open');
-      return;
-    }
-    wrapper.classList.toggle('sidebar-collapsed');
-  };
-
-  backdrop?.addEventListener('click', () => wrapper.classList.remove('sidebar-mobile-open'));
-  navLinks.forEach((link) => link.addEventListener('click', () => {
-    if (window.innerWidth <= 768) wrapper.classList.remove('sidebar-mobile-open');
-  }));
-
-  window.addEventListener('resize', () => {
-    if (window.innerWidth > 768) {
-      wrapper.classList.remove('sidebar-mobile-open');
-    }
-  });
+  btn.onclick = () => wrapper.classList.toggle('sidebar-collapsed');
 }
 
 startBjClock();
@@ -186,7 +163,6 @@ refreshGlobalStatus();
 refreshGlobalAvatar();
 initSidebarToggle();
 setInterval(refreshGlobalStatus, 3000);
-setInterval(refreshGlobalAvatar, 10000);
 </script>
 {% block scripts %}{% endblock %}
 </body>
