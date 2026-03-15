@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+
 import time
 import random
 import socket
@@ -102,6 +103,18 @@ class SystemLog(db.Model):
     log_type = db.Column(db.String(50), nullable=False)
     content = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+
+class SystemConfig(db.Model):
+    key = db.Column(db.String(80), primary_key=True)
+    value = db.Column(db.Text, nullable=False, default="")
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class DailyDetectionDuration(db.Model):
+    day = db.Column(db.String(10), primary_key=True)  # YYYY-MM-DD
+    seconds = db.Column(db.Integer, nullable=False, default=0)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 @login_manager.user_loader
@@ -225,6 +238,63 @@ def add_log(log_type: str, content: str, user_id: int | None = None, result: str
     db.session.commit()
 
 
+def set_config_json(key: str, value: dict):
+    record = db.session.get(SystemConfig, key)
+    payload = json.dumps(value, ensure_ascii=False)
+    if record:
+        record.value = payload
+    else:
+        db.session.add(SystemConfig(key=key, value=payload))
+    db.session.commit()
+
+
+def get_config_json(key: str, default: dict):
+    record = db.session.get(SystemConfig, key)
+    if not record:
+        return default
+    try:
+        data = json.loads(record.value)
+        if isinstance(data, dict):
+            return data
+    except json.JSONDecodeError:
+        pass
+    return default
+
+
+def add_duration_seconds(start_dt: datetime, end_dt: datetime):
+    if end_dt <= start_dt:
+        return
+    cursor = start_dt
+    while cursor < end_dt:
+        next_day = datetime(cursor.year, cursor.month, cursor.day) + timedelta(days=1)
+        seg_end = min(end_dt, next_day)
+        seg_seconds = int((seg_end - cursor).total_seconds())
+        day_key = cursor.strftime("%Y-%m-%d")
+        rec = db.session.get(DailyDetectionDuration, day_key)
+        if not rec:
+            rec = DailyDetectionDuration(day=day_key, seconds=0)
+            db.session.add(rec)
+        rec.seconds += max(seg_seconds, 0)
+        cursor = seg_end
+    db.session.commit()
+
+
+def get_today_detection_seconds() -> int:
+    day_key = datetime.utcnow().strftime("%Y-%m-%d")
+    rec = db.session.get(DailyDetectionDuration, day_key)
+    total = rec.seconds if rec else 0
+    if runtime_state["camera_on"] and runtime_state["camera_started_at"]:
+        start_ts = runtime_state["camera_started_at"]
+        start_dt = datetime.utcfromtimestamp(start_ts)
+        now = datetime.utcnow()
+        if start_dt.strftime("%Y-%m-%d") == day_key:
+            total += int((now - start_dt).total_seconds())
+        elif start_dt < now:
+            day_start = datetime(now.year, now.month, now.day)
+            total += int((now - day_start).total_seconds())
+    return max(total, 0)
+
+
 def init_db():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with app.app_context():
@@ -252,6 +322,11 @@ def init_db():
         if "avatar_url" not in user_columns:
             db.session.execute(text("ALTER TABLE user ADD COLUMN avatar_url VARCHAR(255) NOT NULL DEFAULT ''"))
             db.session.commit()
+
+        saved_openmv = get_config_json("openmv_settings", openmv_settings.copy())
+        openmv_settings.update(saved_openmv)
+        if not db.session.get(SystemConfig, "openmv_settings"):
+            set_config_json("openmv_settings", openmv_settings)
 
         admin = User.query.filter_by(username="admin").first()
         if not admin:
@@ -365,10 +440,13 @@ def register():
 @app.route("/logout")
 @login_required
 def logout():
+    if runtime_state["camera_started_at"]:
+        add_duration_seconds(datetime.utcfromtimestamp(runtime_state["camera_started_at"]), datetime.utcnow())
     runtime_state["camera_on"] = False
     runtime_state["detection_on"] = False
     runtime_state["camera_state"] = "未连接"
     runtime_state["openmv_connected"] = False
+    runtime_state["camera_started_at"] = None
     add_log("auth", f"用户退出: {current_user.username}", current_user.id)
     logout_user()
     return redirect(url_for("login"))
@@ -425,6 +503,7 @@ def system_status():
             "last_detection_time": runtime_state["last_detection_time"],
             "camera_started_at": runtime_state["camera_started_at"],
             "last_inference_ms": runtime_state["last_inference_ms"],
+
             "server_time": bjt_now().strftime("%Y-%m-%d %H:%M:%S"),
         }
     )
@@ -504,6 +583,7 @@ def update_openmv_settings():
     if openmv_serial_conn and openmv_serial_conn.is_open:
         openmv_serial_conn.baudrate = openmv_settings["baudrate"]
         openmv_serial_conn.timeout = openmv_settings["serial_timeout"] / 1000
+    set_config_json("openmv_settings", openmv_settings)
     add_log("device", f"更新 OpenMV 配置: {openmv_settings}", current_user.id)
     return jsonify({"ok": True, "settings": openmv_settings})
 
@@ -520,7 +600,7 @@ def start_camera():
     runtime_state["camera_on"] = True
     runtime_state["camera_state"] = "已连接" if camera_type == "local" else "连接中"
     if runtime_state["camera_started_at"] is None:
-        runtime_state["camera_started_at"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
     add_log("device", f"摄像头已开启({camera_type})", current_user.id)
     return jsonify({"ok": True, "camera_on": True, "camera_type": camera_type})
 
@@ -528,6 +608,9 @@ def start_camera():
 @app.post("/api/camera/stop")
 @login_required
 def stop_camera():
+    if runtime_state["camera_started_at"]:
+        start_dt = datetime.utcfromtimestamp(runtime_state["camera_started_at"])
+        add_duration_seconds(start_dt, datetime.utcnow())
     runtime_state["camera_on"] = False
     runtime_state["detection_on"] = False
     runtime_state["camera_state"] = "未连接"

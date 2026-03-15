@@ -26,11 +26,15 @@ async function refreshAdmin(resetLogs = true) {
     li.innerHTML = `<div><b>${u.username}</b> (${u.is_admin ? '管理员' : '普通用户'}) / ${u.status}</div>
       <div class='small text-muted'>邮箱: ${u.email || '-'} | 电话: ${u.phone || '-'} | 注册: ${u.created_at}</div>
       <div class='mt-1 d-flex gap-1 flex-wrap'>
+        <button class='btn btn-sm btn-outline-secondary'>查看</button>
         <button class='btn btn-sm btn-outline-warning'>重置密码</button>
         <button class='btn btn-sm btn-outline-info'>编辑</button>
         <button class='btn btn-sm btn-outline-danger'>删除</button>
       </div>`;
-    const [pwdBtn, editBtn, delBtn] = li.querySelectorAll('button');
+    const [viewBtn, pwdBtn, editBtn, delBtn] = li.querySelectorAll('button');
+    viewBtn.onclick = () => {
+      alert(`用户：${u.username}\n角色：${u.is_admin ? '管理员' : '普通用户'}\n状态：${u.status}\n邮箱：${u.email || '-'}\n电话：${u.phone || '-'}\n注册时间：${u.created_at}\n最近登录：${u.last_login_at || '-'}`);
+    };
     pwdBtn.onclick = async () => {
       const p = prompt(`请输入 ${u.username} 的新密码（至少6位）`, '12345678');
       if (!p) return;

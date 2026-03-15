@@ -34,6 +34,11 @@ document.getElementById('changePwdBtn').onclick = async () => {
   if (!old_password) return;
   const new_password = prompt('请输入新密码（至少6位）');
   if (!new_password) return;
+  const confirm_password = prompt('请再次输入新密码');
+  if (confirm_password !== new_password) {
+    showToast('两次输入的新密码不一致', 'warning');
+    return;
+  }
   const res = await fetch('/api/account/password', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

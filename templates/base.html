@@ -23,6 +23,12 @@
   {% endif %}
 
   <main class="flex-grow-1 p-3 p-md-4 main-content page-transition">
+    {% if not current_user.is_authenticated %}
+    <div class="d-flex justify-content-end gap-2 mb-3">
+      <a class="btn btn-outline-primary btn-sm" href="{{ url_for('login') }}">登录</a>
+      <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('register') }}">注册</a>
+    </div>
+    {% endif %}
     {% if current_user.is_authenticated %}
     <div class="topbar-meta mb-3">
       <span class="badge text-bg-dark" id="globalCameraStatus">摄像头：未连接</span>

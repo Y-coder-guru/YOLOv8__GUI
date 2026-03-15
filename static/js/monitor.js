@@ -13,8 +13,7 @@ let stream = null;
 let timer = null;
 let frameTimer = null;
 let durationTimer = null;
-let startAt = null;
-let serverCameraStartedAt = null;
+
 
 async function postApi(url, payload) {
   const res = await fetch(url, {
@@ -31,6 +30,11 @@ function formatDuration(ms) {
   const m = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
   const s = String(sec % 60).padStart(2, '0');
   return `${h}:${m}:${s}`;
+}
+
+function renderDurationTick() {
+  const extra = Math.max(0, Math.floor((Date.now() - durationBaseAt) / 1000));
+  document.getElementById('todayDuration').textContent = formatDuration((durationBaseSeconds + extra) * 1000);
 }
 
 function drawBoxes(boxes = []) {
@@ -66,26 +70,20 @@ function renderCounts(counts = {}) {
   });
 }
 
-function syncDuration() {
-  const base = startAt || serverCameraStartedAt;
-  if (!base) {
-    document.getElementById('todayDuration').textContent = '00:00:00';
-    return;
-  }
-  document.getElementById('todayDuration').textContent = formatDuration(Date.now() - base);
+
 }
 
 async function refreshSystem() {
   const data = await fetch('/api/system/status').then((r) => r.json());
+  if (!data.ok) return;
+
+  cameraType.value = data.camera_type || 'local';
+  openmvPanel.classList.toggle('d-none', cameraType.value !== 'openmv');
+
   const isOnline = data.camera_on && data.camera_state !== '未连接';
   document.getElementById('cameraStateMini').textContent = isOnline ? '在线' : '离线';
 
-  if (data.camera_started_at) {
-    serverCameraStartedAt = new Date(data.camera_started_at.replace(' ', 'T')).getTime();
-  }
-  if (!data.camera_on) {
-    startAt = null;
-    serverCameraStartedAt = null;
+
   }
 
   statusText.textContent = `状态：${data.detection_on ? '运行中' : (data.camera_on ? '摄像头已开启' : '待机')}`;
@@ -115,7 +113,7 @@ async function pollDetection() {
   const running = cards.camera_on && data.detection_on;
   statusText.textContent = `状态：${running ? '运行中' : '待机'}`;
   cameraMeta.textContent = `类型：${cards.camera_type || '-'} | 分辨率：${cards.resolution || '-'} | 帧率：${cards.fps || '-'}fps`;
-  perfMeta.textContent = `推理耗时：${cards.inference_ms}ms`;
+  perfMeta.textContent = `推理耗时：${Number(cards.inference_ms || 0).toFixed(2)}ms`;
   document.getElementById('onlineUsers').textContent = cards.active_users;
 
   const cfg = stat.cards.openmv_settings || {};
@@ -190,12 +188,9 @@ document.getElementById('openCameraBtn').onclick = async () => {
       showToast(resp.message || '摄像头开启失败', 'warning');
       return;
     }
-    if (!startAt) startAt = Date.now();
-    serverCameraStartedAt = startAt;
-    if (durationTimer) clearInterval(durationTimer);
-    durationTimer = setInterval(syncDuration, 1000);
-    syncDuration();
+
     showToast('摄像头已开启');
+    await refreshSystem();
   } catch (e) {
     statusText.textContent = '状态：无法访问摄像头（请检查浏览器权限）';
   }
@@ -208,18 +203,15 @@ document.getElementById('closeCameraBtn').onclick = async () => {
   }
   if (timer) clearInterval(timer);
   if (frameTimer) clearInterval(frameTimer);
-  if (durationTimer) clearInterval(durationTimer);
   timer = null;
   frameTimer = null;
-  durationTimer = null;
   await postApi('/api/camera/stop');
-  startAt = null;
-  serverCameraStartedAt = null;
-  syncDuration();
+
   drawBoxes([]);
   renderCounts({});
   statusText.textContent = '状态：待机';
   showToast('摄像头已关闭', 'secondary');
+  await refreshSystem();
 };
 
 document.getElementById('startDetBtn').onclick = async () => {
@@ -254,8 +246,7 @@ document.getElementById('fullscreenBtn').onclick = async () => {
   }
 };
 
-if (durationTimer) clearInterval(durationTimer);
-durationTimer = setInterval(syncDuration, 1000);
+
 setInterval(refreshSystem, 2500);
 refreshSystem();
-syncDuration();
+renderDurationTick();

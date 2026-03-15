@@ -111,9 +111,6 @@ document.getElementById('rangeType').onchange = refreshAdvanced;
 document.getElementById('startTime').onchange = refreshAdvanced;
 document.getElementById('endTime').onchange = refreshAdvanced;
 
-document.getElementById('exportCsvBtn').onclick = () => window.open('/api/stats/export?format=csv');
-document.getElementById('exportExcelBtn').onclick = () => window.open('/api/stats/export?format=excel');
-document.getElementById('exportJsonBtn').onclick = () => window.open('/api/stats/export?format=json');
 
 document.getElementById('clearDataBtn').onclick = async () => {
   const res = await fetch('/api/admin/history', { method: 'DELETE' });

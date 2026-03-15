@@ -75,3 +75,7 @@ document.getElementById('prevPage').onclick = () => { if (page > 1) { page -= 1;
 document.getElementById('nextPage').onclick = () => { const totalPage = Math.max(1, Math.ceil(lastTotal / pageSize)); if (page < totalPage) { page += 1; loadHistory(); } };
 
 loadHistory();
+
+document.getElementById('exportCsvBtn').onclick = () => window.open('/api/stats/export?format=csv');
+document.getElementById('exportExcelBtn').onclick = () => window.open('/api/stats/export?format=excel');
+document.getElementById('exportJsonBtn').onclick = () => window.open('/api/stats/export?format=json');
