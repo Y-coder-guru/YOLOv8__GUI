@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import time
 import random
 import socket
 from collections import Counter
@@ -127,16 +128,21 @@ class YoloModelService:
     def __init__(self):
         self.model_path = BASE_DIR / "models" / "best.pt"
         self.model = None
-        if YOLO and self.model_path.exists():
+        if YOLO:
             try:
-                self.model = YOLO(str(self.model_path))
+                if self.model_path.exists():
+                    self.model = YOLO(str(self.model_path))
+                else:
+                    self.model = YOLO("yolov8n.pt")
             except Exception:
                 self.model = None
 
     def predict_from_frame(self, frame_meta: dict | None = None) -> dict:
         if self.model:
-            # 这里可按需替换为真实帧输入（当前演示环境没有摄像头原始帧缓冲）
-            result = self.model.predict(source="https://ultralytics.com/images/bus.jpg", verbose=False)[0]
+            # 演示环境优先使用本地测试图，避免 URL 不可用。
+            demo_img = BASE_DIR / "static" / "img" / "yolo_demo.jpg"
+            source = str(demo_img) if demo_img.exists() else "https://ultralytics.com/images/bus.jpg"
+            result = self.model.predict(source=source, verbose=False)[0]
             boxes = []
             counts = Counter()
             for b in result.boxes:
@@ -177,6 +183,8 @@ runtime_state = {
     "openmv_target": "",
     "openmv_last_frame_at": None,
     "openmv_last_len": 0,
+    "camera_started_at": None,
+    "last_inference_ms": 0,
 }
 
 openmv_serial_conn = None
@@ -415,6 +423,8 @@ def system_status():
             "openmv_target": runtime_state["openmv_target"],
             "openmv_settings": openmv_settings,
             "last_detection_time": runtime_state["last_detection_time"],
+            "camera_started_at": runtime_state["camera_started_at"],
+            "last_inference_ms": runtime_state["last_inference_ms"],
             "server_time": bjt_now().strftime("%Y-%m-%d %H:%M:%S"),
         }
     )
@@ -509,6 +519,8 @@ def start_camera():
     runtime_state["camera_type"] = camera_type
     runtime_state["camera_on"] = True
     runtime_state["camera_state"] = "已连接" if camera_type == "local" else "连接中"
+    if runtime_state["camera_started_at"] is None:
+        runtime_state["camera_started_at"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     add_log("device", f"摄像头已开启({camera_type})", current_user.id)
     return jsonify({"ok": True, "camera_on": True, "camera_type": camera_type})
 
@@ -519,6 +531,8 @@ def stop_camera():
     runtime_state["camera_on"] = False
     runtime_state["detection_on"] = False
     runtime_state["camera_state"] = "未连接"
+    runtime_state["camera_started_at"] = None
+    runtime_state["last_inference_ms"] = 0
     if runtime_state["camera_type"] == "openmv":
         runtime_state["openmv_connected"] = False
     add_log("device", "摄像头已关闭", current_user.id)
@@ -554,7 +568,9 @@ def frame_data():
         return jsonify({"ok": True, "boxes": [], "counts": {}, "detection_on": False})
 
     frame_meta = {"source": runtime_state["camera_type"], "openmv": openmv_settings}
+    infer_start = time.perf_counter()
     result = model_service.predict_from_frame(frame_meta=frame_meta)
+    runtime_state["last_inference_ms"] = round((time.perf_counter() - infer_start) * 1000, 2)
     runtime_state["last_detection_time"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
     for category, count in result["counts"].items():
@@ -611,7 +627,7 @@ def live_stats():
                 "camera_type": runtime_state["camera_type"],
                 "resolution": openmv_settings["resolution"],
                 "fps": openmv_settings["fps"],
-                "inference_ms": random.randint(25, 80),
+                "inference_ms": runtime_state["last_inference_ms"] or random.randint(25, 80),
                 "camera_on": runtime_state["camera_on"],
                 "camera_state": runtime_state["camera_state"],
                 "openmv_settings": openmv_settings,
@@ -816,7 +832,7 @@ def admin_overview():
             "metrics": {
                 "user_count": User.query.count(),
                 "history_total": DetectionRecord.query.count(),
-                "history_total_desc": "历史总量=系统中累计保存的检测记录条数",
+                "history_total_desc": "累计检测记录=系统中累计保存的检测记录条数",
                 "camera_on": runtime_state["camera_on"],
             "camera_state": runtime_state["camera_state"],
                 "detection_on": runtime_state["detection_on"],

@@ -14,6 +14,7 @@ let timer = null;
 let frameTimer = null;
 let durationTimer = null;
 let startAt = null;
+let serverCameraStartedAt = null;
 
 async function postApi(url, payload) {
   const res = await fetch(url, {
@@ -66,21 +67,38 @@ function renderCounts(counts = {}) {
 }
 
 function syncDuration() {
-  if (!startAt) {
+  const base = startAt || serverCameraStartedAt;
+  if (!base) {
     document.getElementById('todayDuration').textContent = '00:00:00';
     return;
   }
-  document.getElementById('todayDuration').textContent = formatDuration(Date.now() - startAt);
+  document.getElementById('todayDuration').textContent = formatDuration(Date.now() - base);
 }
 
 async function refreshSystem() {
   const data = await fetch('/api/system/status').then((r) => r.json());
   const isOnline = data.camera_on && data.camera_state !== '未连接';
   document.getElementById('cameraStateMini').textContent = isOnline ? '在线' : '离线';
+
+  if (data.camera_started_at) {
+    serverCameraStartedAt = new Date(data.camera_started_at.replace(' ', 'T')).getTime();
+  }
   if (!data.camera_on) {
     startAt = null;
-    syncDuration();
+    serverCameraStartedAt = null;
   }
+
+  statusText.textContent = `状态：${data.detection_on ? '运行中' : (data.camera_on ? '摄像头已开启' : '待机')}`;
+  cameraMeta.textContent = `类型：${data.camera_type || '-'} | 分辨率：${data.openmv_settings?.resolution || '-'} | 帧率：${data.openmv_settings?.fps || '-'}fps`;
+  perfMeta.textContent = `推理耗时：${data.last_inference_ms || '-'}ms`;
+  const cfg = data.openmv_settings || {};
+  document.getElementById('cfgMeta1').textContent = `波特率：${cfg.baudrate || '-'} | 曝光：${cfg.exposure || '-'} | 增益：${cfg.gain || '-'}`;
+  document.getElementById('cfgMeta2').textContent = `超时：${cfg.serial_timeout || '-'}ms | 自动白平衡：${cfg.auto_white_balance ? '开' : '关'} | 镜像：${cfg.flip_horizontal ? 'H' : '-'}${cfg.flip_vertical ? 'V' : '-'}`;
+
+  if (data.camera_type === 'openmv') {
+    openmvPanel.classList.remove('d-none');
+  }
+  syncDuration();
 }
 
 async function pollDetection() {
@@ -173,6 +191,7 @@ document.getElementById('openCameraBtn').onclick = async () => {
       return;
     }
     if (!startAt) startAt = Date.now();
+    serverCameraStartedAt = startAt;
     if (durationTimer) clearInterval(durationTimer);
     durationTimer = setInterval(syncDuration, 1000);
     syncDuration();
@@ -195,6 +214,7 @@ document.getElementById('closeCameraBtn').onclick = async () => {
   durationTimer = null;
   await postApi('/api/camera/stop');
   startAt = null;
+  serverCameraStartedAt = null;
   syncDuration();
   drawBoxes([]);
   renderCounts({});
@@ -234,6 +254,8 @@ document.getElementById('fullscreenBtn').onclick = async () => {
   }
 };
 
+if (durationTimer) clearInterval(durationTimer);
+durationTimer = setInterval(syncDuration, 1000);
 setInterval(refreshSystem, 2500);
 refreshSystem();
 syncDuration();
