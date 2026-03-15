@@ -4,18 +4,21 @@
 <h2 class="mb-3">管理员后台 / 系统设置</h2>
 <div class="row g-3 mb-3">
   <div class="col-md-3"><div class="card p-3"><div>用户总数</div><h4 id="mUser">0</h4></div></div>
-  <div class="col-md-3"><div class="card p-3"><div>历史总量</div><h4 id="mHistory">0</h4></div></div>
+  <div class="col-md-3"><div class="card p-3"><div>历史总量</div><h4 id="mHistory">0</h4><small class="text-muted" id="mHistoryDesc">历史总量=累计检测记录条数</small></div></div>
   <div class="col-md-3"><div class="card p-3"><div>摄像头</div><h4 id="mCamera">关闭</h4></div></div>
   <div class="col-md-3"><div class="card p-3"><div>今日日志量</div><h4 id="mLogs">0</h4></div></div>
 </div>
 <div class="row g-3">
-  <div class="col-lg-5">
+  <div class="col-lg-6">
     <div class="card p-3 h-100">
-      <h5>用户列表</h5>
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0">用户管理（增删改查）</h5>
+        <button class="btn btn-sm btn-primary" id="openCreateUser">新增用户</button>
+      </div>
       <ul class="list-group" id="userList"></ul>
     </div>
   </div>
-  <div class="col-lg-7">
+  <div class="col-lg-6">
     <div class="card p-3 h-100">
       <div class="d-flex justify-content-between"><h5>系统日志（滚动加载）</h5><input id="logOperator" class="form-control w-auto" placeholder="按操作人筛选"></div>
       <ul class="list-group mt-2" id="logList" style="max-height:300px;overflow:auto"></ul>
@@ -29,8 +32,12 @@
     <div class="col-md-2"><label class="form-label">分辨率</label><select class="form-select" id="cfgRes"><option>720P</option><option>1080P</option></select></div>
     <div class="col-md-2"><label class="form-label">帧率</label><select class="form-select" id="cfgFps"><option>15</option><option>30</option></select></div>
     <div class="col-md-2"><label class="form-label">波特率</label><input class="form-control" type="number" id="cfgBaud" value="115200"></div>
-    <div class="col-md-1 form-check mt-4"><input class="form-check-input" type="checkbox" id="cfgFlipH"><label class="form-check-label" for="cfgFlipH">水平翻转</label></div>
-    <div class="col-md-1 form-check mt-4"><input class="form-check-input" type="checkbox" id="cfgFlipV"><label class="form-check-label" for="cfgFlipV">垂直翻转</label></div>
+    <div class="col-md-2"><label class="form-label">曝光(0-100)</label><input class="form-control" type="number" id="cfgExposure" value="50"></div>
+    <div class="col-md-2"><label class="form-label">增益</label><input class="form-control" type="number" step="0.1" id="cfgGain" value="1.0"></div>
+    <div class="col-md-2"><label class="form-label">串口超时(ms)</label><input class="form-control" type="number" id="cfgTimeout" value="800"></div>
+    <div class="col-md-2 form-check mt-4"><input class="form-check-input" type="checkbox" id="cfgFlipH"><label class="form-check-label" for="cfgFlipH">水平翻转</label></div>
+    <div class="col-md-2 form-check mt-4"><input class="form-check-input" type="checkbox" id="cfgFlipV"><label class="form-check-label" for="cfgFlipV">垂直翻转</label></div>
+    <div class="col-md-2 form-check mt-4"><input class="form-check-input" type="checkbox" id="cfgAwb" checked><label class="form-check-label" for="cfgAwb">自动白平衡</label></div>
     <div class="col-md-2"><button class="btn btn-primary" id="saveOpenmvCfg">保存配置</button></div>
   </div>
 </div>

@@ -1,13 +1,34 @@
 {% extends 'base.html' %}
 {% block title %}个人中心{% endblock %}
 {% block content %}
-<h2>个人中心</h2>
-<div class="card p-3">
-  <p>用户名：{{ current_user.username }}</p>
-  <p>角色：{{ '管理员' if current_user.is_admin else '普通用户' }}</p>
-  <p>注册时间：{{ current_user.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
-  <hr>
-  <h5>账号安全</h5>
-  <p class="text-muted">如需修改密码请联系管理员（示例实现）。</p>
+<h2 class="mb-3">个人中心</h2>
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card p-3">
+      <h5>个人信息</h5>
+      <div class="row g-2">
+        <div class="col-md-6"><label class="form-label">用户名</label><input class="form-control" id="pfUsername"></div>
+        <div class="col-md-6"><label class="form-label">邮箱</label><input class="form-control" id="pfEmail"></div>
+        <div class="col-md-6"><label class="form-label">电话</label><input class="form-control" id="pfPhone"></div>
+        <div class="col-md-6"><label class="form-label">头像URL</label><input class="form-control" id="pfAvatar"></div>
+        <div class="col-md-12"><label class="form-label">注册时间（不可修改）</label><input class="form-control" id="pfCreated" disabled></div>
+      </div>
+      <button class="btn btn-primary mt-3" id="saveProfileBtn">保存个人信息</button>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card p-3">
+      <h5>账号操作</h5>
+      <div class="d-grid gap-2">
+        <button class="btn btn-outline-primary" id="changePwdBtn">修改密码</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('login') }}">重新登录</a>
+        <a class="btn btn-outline-success" href="{{ url_for('register') }}">注册新账号</a>
+        <a class="btn btn-danger" href="{{ url_for('logout') }}">退出登录</a>
+      </div>
+    </div>
+  </div>
 </div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/profile.js') }}"></script>
 {% endblock %}
