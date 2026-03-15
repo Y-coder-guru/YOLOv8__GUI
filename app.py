@@ -34,7 +34,7 @@ from flask_login import (
     logout_user,
 )
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func, text
+from sqlalchemy import func, inspect, text
 
 try:
     import serial
@@ -330,13 +330,12 @@ def get_today_detection_seconds() -> int:
 
 
 def init_db():
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if IS_SQLITE:
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with app.app_context():
         db.create_all()
-        user_columns = {
-            row[1]
-            for row in db.session.execute(text("PRAGMA table_info('user')")).fetchall()
-        }
+        inspector = inspect(db.engine)
+        user_columns = {col["name"] for col in inspector.get_columns("user")}
         if "is_active_account" not in user_columns:
             db.session.execute(
                 text(
@@ -381,6 +380,9 @@ def get_lan_ip() -> str:
             return s.getsockname()[0]
     except OSError:
         return "127.0.0.1"
+
+
+init_db()
 
 
 def parse_time_range(range_key: str, start_time: str, end_time: str):
@@ -1256,7 +1258,6 @@ def openmv_frame():
 
 
 if __name__ == "__main__":
-    init_db()
     lan_ip = get_lan_ip()
     print("Local:   http://127.0.0.1:5000")
     print("All NIC: http://0.0.0.0:5000")
