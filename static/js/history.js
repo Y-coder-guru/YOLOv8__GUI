@@ -5,8 +5,10 @@ const pageSize = 20;
 let lastTotal = 0;
 
 function getFilters() {
+  const keyword = document.getElementById('keyword').value.trim();
+  const note = document.getElementById('note').value.trim();
   return {
-    keyword: document.getElementById('keyword').value.trim(),
+    keyword: [keyword, note].filter(Boolean).join(' '),
     category: document.getElementById('category').value.trim(),
     status: document.getElementById('status').value.trim(),
     start_time: document.getElementById('startTime').value,
@@ -27,7 +29,15 @@ async function showDetail(id) {
     return;
   }
   const r = data.record;
-  body.innerHTML = `<div class="row"><div class="col-md-6"><div class="fake-shot">检测画面占位</div></div><div class="col-md-6"><p><b>时间:</b> ${r.time}</p><p><b>类别:</b> ${r.category}</p><p><b>数量:</b> ${r.count}</p><p><b>操作人:</b> ${r.operator}</p><p><b>操作类型:</b> ${r.operation_type}</p><p><b>完整数据:</b> confidence=${r.confidence}</p></div></div>`;
+  body.innerHTML = `<div class="row"><div class="col-md-6"><div class="fake-shot">检测画面占位</div></div><div class="col-md-6"><p><b>时间:</b> ${r.time}</p><p><b>类别:</b> ${r.category}</p><p><b>数量:</b> ${r.count}</p><p><b>操作人:</b> ${r.operator}</p><p><b>操作类型:</b> ${r.operation_type}</p><p><b>置信度:</b> ${r.confidence}</p></div></div>`;
+}
+
+async function removeRecord(id) {
+  if (!confirm(`确认删除记录 ID=${id} ?`)) return;
+  const res = await fetch(`/api/history/${id}`, { method: 'DELETE' });
+  const data = await res.json();
+  showToast(res.ok ? '记录已删除' : (data.message || '删除失败'), res.ok ? 'warning' : 'danger');
+  loadHistory();
 }
 
 async function loadHistory() {
@@ -40,13 +50,15 @@ async function loadHistory() {
   page = data.page;
   tbody.innerHTML = '';
   if (!data.records.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">暂无历史记录，请先进行检测。<br><small>将显示：时间、ID、目标类别、数量、操作人、操作类型</small></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">暂无历史记录，请先进行检测。</td></tr>';
   }
 
   data.records.forEach((r) => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${r.id}</td><td>${r.time}</td><td>${r.category}</td><td>${r.count}</td><td>${r.operator}</td><td>${r.operation_type}</td><td><button class="btn btn-outline-primary uniform-btn">详情</button></td>`;
-    tr.querySelector('button').onclick = () => showDetail(r.id);
+    tr.innerHTML = `<td>${r.id}</td><td>${r.time}</td><td>${r.category}</td><td>${r.count}</td><td>${r.operator}</td><td>${r.operation_type}</td><td class='d-flex gap-1 flex-wrap'><button class='btn btn-outline-primary uniform-btn btn-sm'>查看</button><button class='btn btn-outline-danger uniform-btn btn-sm'>删除</button></td>`;
+    const [detailBtn, delBtn] = tr.querySelectorAll('button');
+    detailBtn.onclick = () => showDetail(r.id);
+    delBtn.onclick = () => removeRecord(r.id);
     tbody.appendChild(tr);
   });
 
@@ -56,7 +68,7 @@ async function loadHistory() {
 
 document.getElementById('searchBtn').onclick = () => { page = 1; loadHistory(); };
 document.getElementById('resetBtn').onclick = () => {
-  ['keyword', 'category', 'status', 'startTime', 'endTime'].forEach((id) => (document.getElementById(id).value = ''));
+  ['keyword', 'note', 'category', 'status', 'startTime', 'endTime'].forEach((id) => (document.getElementById(id).value = ''));
   page = 1;
   loadHistory();
 };

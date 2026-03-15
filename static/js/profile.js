@@ -16,6 +16,10 @@ document.getElementById('saveProfileBtn').onclick = async () => {
     phone: document.getElementById('pfPhone').value.trim(),
     avatar_url: document.getElementById('pfAvatar').value.trim(),
   };
+  if (!payload.username) {
+    showToast('用户名不能为空', 'warning');
+    return;
+  }
   const res = await fetch('/api/account/profile', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -37,6 +41,10 @@ document.getElementById('changePwdBtn').onclick = async () => {
   });
   const data = await res.json();
   showToast(res.ok ? '密码修改成功' : (data.message || '密码修改失败'), res.ok ? 'success' : 'danger');
+};
+
+document.getElementById('reloginBtn').onclick = () => {
+  window.location.href = '/logout';
 };
 
 loadMe();

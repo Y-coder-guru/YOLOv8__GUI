@@ -11,7 +11,7 @@
         <div class="col-md-6"><label class="form-label">邮箱</label><input class="form-control" id="pfEmail"></div>
         <div class="col-md-6"><label class="form-label">电话</label><input class="form-control" id="pfPhone"></div>
         <div class="col-md-6"><label class="form-label">头像URL</label><input class="form-control" id="pfAvatar"></div>
-        <div class="col-md-12"><label class="form-label">注册时间（不可修改）</label><input class="form-control" id="pfCreated" disabled></div>
+        <div class="col-md-12"><label class="form-label">注册时间</label><input class="form-control" id="pfCreated" disabled></div>
       </div>
       <button class="btn btn-primary mt-3" id="saveProfileBtn">保存个人信息</button>
     </div>
@@ -21,7 +21,7 @@
       <h5>账号操作</h5>
       <div class="d-grid gap-2">
         <button class="btn btn-outline-primary" id="changePwdBtn">修改密码</button>
-        <a class="btn btn-outline-secondary" href="{{ url_for('login') }}">重新登录</a>
+        <button class="btn btn-outline-secondary" id="reloginBtn">重新登录</button>
         <a class="btn btn-outline-success" href="{{ url_for('register') }}">注册新账号</a>
         <a class="btn btn-danger" href="{{ url_for('logout') }}">退出登录</a>
       </div>
