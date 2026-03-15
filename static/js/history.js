@@ -19,7 +19,7 @@ function getFilters() {
 
 function getExportUrl(format) {
   const f = getFilters();
-  return `/api/stats/export?format=${format}&start_time=${encodeURIComponent(f.start_time)}&end_time=${encodeURIComponent(f.end_time)}`;
+  return `/api/stats/export?format=${format}&keyword=${encodeURIComponent(f.keyword)}&category=${encodeURIComponent(f.category)}&status=${encodeURIComponent(f.status)}&start_time=${encodeURIComponent(f.start_time)}&end_time=${encodeURIComponent(f.end_time)}`;
 }
 
 async function showDetail(id) {

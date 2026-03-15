@@ -75,10 +75,11 @@ app.config.update(
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     SQLALCHEMY_ENGINE_OPTIONS={
         "pool_pre_ping": True,
-        "pool_recycle": int(os.getenv("SQLALCHEMY_POOL_RECYCLE", "1800")),
-        "pool_size": int(os.getenv("SQLALCHEMY_POOL_SIZE", "5")),
-        "max_overflow": int(os.getenv("SQLALCHEMY_MAX_OVERFLOW", "10")),
-        "pool_timeout": int(os.getenv("SQLALCHEMY_POOL_TIMEOUT", "30")),
+        "pool_recycle": int(os.getenv("SQLALCHEMY_POOL_RECYCLE", "300")),
+        "pool_size": int(os.getenv("SQLALCHEMY_POOL_SIZE", "1")),
+        "max_overflow": int(os.getenv("SQLALCHEMY_MAX_OVERFLOW", "2")),
+        "pool_timeout": int(os.getenv("SQLALCHEMY_POOL_TIMEOUT", "15")),
+        "pool_use_lifo": True,
     }
     if not IS_SQLITE
     else {},
@@ -257,14 +258,19 @@ def verify_password(password_hash: str, password: str) -> bool:
 
 
 def add_log(log_type: str, content: str, user_id: int | None = None, result: str = "成功"):
+    """记录系统日志，且避免日志写入异常影响主流程。"""
     operator = "system"
     ip = request.remote_addr if has_request_context() else "-"
-    if user_id:
-        user = User.query.get(user_id)
-        if user:
-            operator = user.username
-    db.session.add(SystemLog(log_type=log_type, content=content, user_id=user_id, operator=operator, ip=ip or "-", result=result))
-    db.session.commit()
+    try:
+        if user_id:
+            user = User.query.get(user_id)
+            if user:
+                operator = user.username
+        db.session.add(SystemLog(log_type=log_type, content=content, user_id=user_id, operator=operator, ip=ip or "-", result=result))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        app.logger.exception("写入系统日志失败: %s", content)
 
 
 def set_config_json(key: str, value: dict):
@@ -417,12 +423,21 @@ def make_session_permanent():
         session.permanent = True
 
 
-@app.teardown_appcontext
-def shutdown_session(exception=None):
-    """确保每个请求结束后都释放 Session/连接，避免连接池耗尽。"""
+def _cleanup_db_session(exception=None):
+    """统一清理 DB 会话，避免连接池连接被长时间占用。"""
     if exception is not None:
         db.session.rollback()
     db.session.remove()
+
+
+@app.teardown_request
+def shutdown_session_request(exception=None):
+    _cleanup_db_session(exception)
+
+
+@app.teardown_appcontext
+def shutdown_session_appcontext(exception=None):
+    _cleanup_db_session(exception)
 
 
 @app.route("/")
@@ -867,7 +882,31 @@ def advanced_stats():
 @login_required
 def export_stats():
     fmt = request.args.get("format", "csv").lower()
-    records = DetectionRecord.query.order_by(DetectionRecord.detect_time.desc()).limit(3000).all()
+    query = DetectionRecord.query
+    keyword = request.args.get("keyword", "").strip()
+    category = request.args.get("category", "").strip()
+    status = request.args.get("status", "").strip()
+    start_time = request.args.get("start_time", "").strip()
+    end_time = request.args.get("end_time", "").strip()
+
+    if keyword:
+        query = query.filter((DetectionRecord.category.contains(keyword)) | (DetectionRecord.note.contains(keyword)))
+    if category:
+        query = query.filter_by(category=category)
+    if status:
+        query = query.filter_by(operation_type=status)
+    if start_time:
+        try:
+            query = query.filter(DetectionRecord.detect_time >= datetime.fromisoformat(start_time))
+        except ValueError:
+            pass
+    if end_time:
+        try:
+            query = query.filter(DetectionRecord.detect_time <= datetime.fromisoformat(end_time))
+        except ValueError:
+            pass
+
+    records = query.order_by(DetectionRecord.detect_time.desc()).limit(3000).all()
     rows = [
         {
             "id": r.id,
