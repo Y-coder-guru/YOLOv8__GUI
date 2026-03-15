@@ -2,6 +2,44 @@ const userList = document.getElementById('userList');
 const logList = document.getElementById('logList');
 let logOffset = 0;
 const logPageSize = 20;
+let canManageUsers = true;
+const userManageSection = document.getElementById('userManageSection');
+
+async function syncPermission() {
+  try {
+    const res = await fetch('/api/account/me');
+    if (!res.ok) return;
+    const data = await res.json();
+    canManageUsers = !!data.user?.is_admin;
+  } catch (e) {
+    canManageUsers = false;
+  }
+  const createBtn = document.getElementById('openCreateUser');
+  if (createBtn) {
+    createBtn.disabled = !canManageUsers;
+    createBtn.title = canManageUsers ? '' : '普通用户无权限执行此操作';
+  }
+  if (userManageSection) {
+    userManageSection.classList.toggle('d-none', !canManageUsers);
+  }
+}
+
+async function refreshCameraStatus() {
+  const el = document.getElementById('mCamera');
+  if (!el) return;
+  try {
+    const res = await fetch('/api/camera/status');
+    const data = await res.json();
+    const connected = data.ok && data.status === 'connected';
+    el.textContent = connected ? '已连接' : '离线';
+    el.classList.toggle('text-success', connected);
+    el.classList.toggle('text-secondary', !connected);
+  } catch (e) {
+    el.textContent = '离线';
+    el.classList.remove('text-success');
+    el.classList.add('text-secondary');
+  }
+}
 
 async function refreshAdmin() {
   const operator = document.getElementById('logOperator').value.trim();
@@ -12,7 +50,6 @@ async function refreshAdmin() {
   animateNumber(document.getElementById('mUser'), data.metrics.user_count);
   animateNumber(document.getElementById('mHistory'), data.metrics.history_total);
   document.getElementById('mHistoryDesc').textContent = data.metrics.history_total_desc;
-  document.getElementById('mCamera').textContent = data.metrics.camera_state || '未连接';
   animateNumber(document.getElementById('mLogs'), data.metrics.today_logs);
 
   userList.innerHTML = "";
@@ -25,21 +62,23 @@ async function refreshAdmin() {
       <div class='small text-muted'>邮箱: ${u.email || '-'} | 电话: ${u.phone || '-'} | 注册: ${u.created_at}</div>
       <div class='mt-1 d-flex gap-1 flex-wrap'>
         <button class='btn btn-sm btn-outline-secondary'>查看</button>
-        <button class='btn btn-sm btn-outline-warning'>修改密码</button>
-        <button class='btn btn-sm btn-outline-info'>编辑</button>
-        <button class='btn btn-sm btn-outline-danger'>删除</button>
+        <button class='btn btn-sm btn-outline-warning' ${canManageUsers ? '' : 'disabled title="普通用户无权限"'}>修改密码</button>
+        <button class='btn btn-sm btn-outline-info' ${canManageUsers ? '' : 'disabled title="普通用户无权限"'}>编辑</button>
+        <button class='btn btn-sm btn-outline-danger' ${canManageUsers ? '' : 'disabled title="普通用户无权限"'}>删除</button>
       </div>`;
     const [viewBtn, pwdBtn, editBtn, delBtn] = li.querySelectorAll('button');
     viewBtn.onclick = () => {
       alert(`用户：${u.username}\n角色：${u.is_admin ? '管理员' : '普通用户'}\n状态：${u.status}\n邮箱：${u.email || '-'}\n电话：${u.phone || '-'}\n注册时间：${u.created_at}\n最近登录：${u.last_login_at || '-'}`);
     };
     pwdBtn.onclick = async () => {
+      if (!canManageUsers) { showToast('普通用户无权限执行该操作', 'warning'); return; }
       const p = prompt(`请输入 ${u.username} 的新密码（至少6位）`, '12345678');
       if (!p) return;
       const r = await fetch(`/api/admin/users/${u.id}/password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: p }) });
       showToast(r.ok ? '密码修改成功' : '密码修改失败', r.ok ? 'success' : 'danger');
     };
     editBtn.onclick = async () => {
+      if (!canManageUsers) { showToast('普通用户无权限执行该操作', 'warning'); return; }
       const username = prompt('用户名', u.username);
       if (!username) return;
       const email = prompt('邮箱', u.email || '');
@@ -55,6 +94,7 @@ async function refreshAdmin() {
       refreshAdmin();
     };
     delBtn.onclick = async () => {
+      if (!canManageUsers) { showToast('普通用户无权限执行该操作', 'warning'); return; }
       if (!confirm(`确认删除用户 ${u.username}？`)) return;
       const r = await fetch(`/api/admin/users/${u.id}`, { method: 'DELETE' });
       const d = await r.json();
@@ -77,6 +117,10 @@ async function refreshAdmin() {
 }
 
 document.getElementById('openCreateUser').onclick = async () => {
+  if (!canManageUsers) {
+    showToast('普通用户无权限执行该操作', 'warning');
+    return;
+  }
   const username = prompt('新用户名');
   if (!username) return;
   const password = prompt('初始密码（至少6位）', '12345678');
@@ -146,6 +190,9 @@ document.getElementById('nextLogPage').onclick = () => {
   refreshAdmin();
 };
 
+syncPermission();
+refreshCameraStatus();
 refreshAdmin();
 loadCameraConfig();
 setInterval(() => refreshAdmin(), 5000);
+setInterval(refreshCameraStatus, 3000);

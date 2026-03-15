@@ -596,6 +596,20 @@ def admin_page():
     return render_template("admin.html")
 
 
+@app.get("/api/camera/status")
+@login_required
+def camera_status():
+    connected = bool(runtime_state["camera_on"] and runtime_state["camera_state"] != "未连接")
+    return jsonify(
+        {
+            "ok": True,
+            "status": "connected" if connected else "disconnected",
+            "connected": connected,
+            "text": "已连接" if connected else "离线",
+        }
+    )
+
+
 @app.get("/api/system/status")
 @login_required
 def system_status():
