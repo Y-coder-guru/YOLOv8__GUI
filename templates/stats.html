@@ -9,18 +9,15 @@
   <div class="col-md-3"><div class="card p-3 metric-card"><div>摄像头状态</div><h4 id="cardCamera">离线</h4></div></div>
 </div>
 <div class="card p-3 mb-3 panel-anim">
-  <div class="row g-2 align-items-end">
-    <div class="col-md-3"><label class="form-label">范围</label><select class="form-select" id="rangeType"><option value="today">今日</option><option value="yesterday">昨日</option><option value="7d">近7天</option><option value="30d">近30天</option><option value="custom">自定义</option></select></div>
-    <div class="col-md-3"><label class="form-label">开始时间</label><input type="datetime-local" step="1" class="form-control" id="startTime"></div>
-    <div class="col-md-3"><label class="form-label">结束时间</label><input type="datetime-local" step="1" class="form-control" id="endTime"></div>
-    <div class="col-md-3"><label class="form-label">类别</label><select class="form-select" id="categoryFilter"><option value="">全部类别</option></select></div>
-  </div>
-  <div class="mt-2 d-flex gap-2 flex-wrap">
-    <button class="btn btn-primary" id="refreshBtn">刷新数据</button>
-    <button class="btn btn-outline-secondary" id="exportCsvBtn">导出 CSV</button>
-    <button class="btn btn-outline-secondary" id="exportExcelBtn">导出 Excel</button>
-    <button class="btn btn-outline-secondary" id="exportJsonBtn">导出 JSON</button>
-    <button class="btn btn-danger" id="clearDataBtn">清空数据</button>
+  <div class="row g-2 align-items-end stats-filter-row">
+    <div class="col-xl-2 col-md-4"><label class="form-label">范围</label><select class="form-select" id="rangeType"><option value="today">今日</option><option value="yesterday">昨日</option><option value="7d">近7天</option><option value="30d">近30天</option><option value="custom">自定义</option></select></div>
+    <div class="col-xl-2 col-md-4"><label class="form-label">开始时间</label><input type="datetime-local" step="1" class="form-control" id="startTime"></div>
+    <div class="col-xl-2 col-md-4"><label class="form-label">结束时间</label><input type="datetime-local" step="1" class="form-control" id="endTime"></div>
+    <div class="col-xl-2 col-md-4"><label class="form-label">类别</label><select class="form-select" id="categoryFilter"><option value="">全部类别</option></select></div>
+    <div class="col-xl-4 col-md-8 d-flex gap-2 flex-wrap stats-actions">
+    <button class="btn btn-primary uniform-btn" id="refreshBtn">刷新数据</button>
+    <button class="btn btn-danger uniform-btn" id="clearDataBtn">清空数据</button>
+    </div>
   </div>
 </div>
 <div class="row g-3">

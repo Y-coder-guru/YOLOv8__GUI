@@ -5,15 +5,15 @@
 <div class="row g-3">
   <div class="col-xl-8">
     <div class="video-panel card p-3 panel-anim h-100">
-      <div class="d-flex gap-2 flex-wrap mb-3 align-items-center monitor-toolbar">
+      <div class="d-flex gap-2 flex-wrap mb-3 align-items-center monitor-toolbar monitor-actions">
         <select class="form-select toolbar-select" id="cameraType">
           <option value="local">本地摄像头</option>
           <option value="openmv">OpenMV 摄像头（COM3）</option>
         </select>
-        <button class="btn btn-primary" id="openCameraBtn">打开摄像头</button>
-        <button class="btn btn-outline-secondary" id="closeCameraBtn">关闭摄像头</button>
-        <button class="btn btn-success" id="startDetBtn">开始检测</button>
-        <button class="btn btn-outline-danger" id="stopDetBtn">停止检测</button>
+        <button class="btn btn-primary uniform-btn" id="openCameraBtn">打开摄像头</button>
+        <button class="btn btn-outline-secondary uniform-btn" id="closeCameraBtn">关闭摄像头</button>
+        <button class="btn btn-success uniform-btn" id="startDetBtn">开始检测</button>
+        <button class="btn btn-outline-danger uniform-btn" id="stopDetBtn">停止检测</button>
       </div>
 
       <div class="openmv-panel mb-3 d-none" id="openmvPanel">
