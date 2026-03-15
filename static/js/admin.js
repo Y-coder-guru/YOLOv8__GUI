@@ -5,6 +5,10 @@ const logPageSize = 20;
 let canManageUsers = false;
 const userManageSection = document.getElementById('userManageSection');
 
+if (!userList || !logList) {
+  console.warn('admin.js: admin DOM 未就绪，跳过初始化');
+}
+
 async function syncPermission() {
   try {
     const res = await fetch('/api/account/me');
@@ -203,9 +207,11 @@ document.getElementById('nextLogPage').onclick = () => {
   refreshAdmin();
 };
 
-syncPermission();
-refreshCameraStatus();
-refreshAdmin();
-loadCameraConfig();
-setInterval(() => refreshAdmin(), 5000);
-setInterval(refreshCameraStatus, 3000);
+if (userList && logList) {
+  syncPermission();
+  refreshCameraStatus();
+  refreshAdmin();
+  loadCameraConfig();
+  setInterval(() => refreshAdmin(), 5000);
+  setInterval(refreshCameraStatus, 3000);
+}
