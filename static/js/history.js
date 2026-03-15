@@ -6,9 +6,8 @@ let lastTotal = 0;
 
 function getFilters() {
   const keyword = document.getElementById('keyword').value.trim();
-  const note = document.getElementById('note').value.trim();
   return {
-    keyword: [keyword, note].filter(Boolean).join(' '),
+    keyword,
     category: document.getElementById('category').value.trim(),
     status: document.getElementById('status').value.trim(),
     start_time: document.getElementById('startTime').value,
@@ -68,7 +67,7 @@ async function loadHistory() {
 
 document.getElementById('searchBtn').onclick = () => { page = 1; loadHistory(); };
 document.getElementById('resetBtn').onclick = () => {
-  ['keyword', 'note', 'category', 'status', 'startTime', 'endTime'].forEach((id) => (document.getElementById(id).value = ''));
+  ['keyword', 'category', 'status', 'startTime', 'endTime'].forEach((id) => (document.getElementById(id).value = ''));
   page = 1;
   loadHistory();
 };
@@ -76,3 +75,7 @@ document.getElementById('prevPage').onclick = () => { if (page > 1) { page -= 1;
 document.getElementById('nextPage').onclick = () => { const totalPage = Math.max(1, Math.ceil(lastTotal / pageSize)); if (page < totalPage) { page += 1; loadHistory(); } };
 
 loadHistory();
+
+document.getElementById('exportCsvBtn').onclick = () => window.open('/api/stats/export?format=csv');
+document.getElementById('exportExcelBtn').onclick = () => window.open('/api/stats/export?format=excel');
+document.getElementById('exportJsonBtn').onclick = () => window.open('/api/stats/export?format=json');

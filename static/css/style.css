@@ -1,5 +1,5 @@
 body { background: #f2f5fb; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; }
-.sidebar { width: 220px; min-height: 100vh; background: #101828; color: #fff; }
+.sidebar { width: 220px; min-height: 100vh; background: #101828; color: #fff; flex-shrink: 0; }
 .sidebar .nav-link { color: #cbd5e1; display: block; padding: 10px 12px; margin-bottom: 4px; border-radius: 10px; transition: all .25s ease; }
 .sidebar .nav-link:hover,.sidebar .nav-link.active { background: #1e293b; color: #fff; transform: translateX(2px); }
 .auth-card { max-width: 420px; }
@@ -33,3 +33,11 @@ body { background: #f2f5fb; font-family: "PingFang SC", "Microsoft YaHei", sans-
 
 .uniform-btn { min-width: 96px; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; }
 .filter-actions .uniform-btn { flex: 1; }
+
+.sidebar h4 { white-space: nowrap; font-size: 1.25rem; line-height: 1.2; }
+.monitor-actions .uniform-btn { flex: 1 1 calc(25% - 0.5rem); min-width: 120px; }
+.stats-actions { align-items: end; }
+.stats-actions .uniform-btn { flex: 1 1 120px; }
+.history-filter-row .form-control, .history-filter-row .form-select { min-height: 38px; }
+
+.history-filter-row .uniform-btn { min-width: 105px; }
