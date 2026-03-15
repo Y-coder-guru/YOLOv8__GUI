@@ -600,6 +600,7 @@ def start_camera():
     runtime_state["camera_on"] = True
     runtime_state["camera_state"] = "已连接" if camera_type == "local" else "连接中"
     if runtime_state["camera_started_at"] is None:
+        runtime_state["camera_started_at"] = time.time()
 
     add_log("device", f"摄像头已开启({camera_type})", current_user.id)
     return jsonify({"ok": True, "camera_on": True, "camera_type": camera_type})
