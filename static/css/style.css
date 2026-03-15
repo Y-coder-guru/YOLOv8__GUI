@@ -40,3 +40,8 @@ body { background: #f2f5fb; font-family: "PingFang SC", "Microsoft YaHei", sans-
 .stats-actions .uniform-btn { flex: 1 1 120px; }
 .history-filter-row .form-control, .history-filter-row .form-select { min-height: 38px; }
 
+
+.history-actions-wrap { padding-top: 6px; }
+.topbar-avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 2px solid #dbeafe; background: #e2e8f0; }
+.log-scroll { max-height: 320px; overflow-y: auto; }
+.profile-row .card { min-height: 100%; }

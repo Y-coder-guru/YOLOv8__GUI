@@ -16,6 +16,7 @@ let frameTimer = null;
 let durationTimer = null;
 let durationBaseSeconds = 0;
 let durationBaseAt = Date.now();
+let durationCameraOn = false;
 
 async function postApi(url, payload) {
   const res = await fetch(url, {
@@ -35,16 +36,19 @@ function formatDuration(ms) {
 }
 
 function renderDurationTick() {
-  const extra = Math.max(0, Math.floor((Date.now() - durationBaseAt) / 1000));
+  const extra = durationCameraOn ? Math.max(0, Math.floor((Date.now() - durationBaseAt) / 1000)) : 0;
   document.getElementById('todayDuration').textContent = formatDuration((durationBaseSeconds + extra) * 1000);
 }
 
-function syncDuration(baseSeconds = 0) {
-  durationBaseSeconds = Math.max(0, Number(baseSeconds || 0));
-  durationBaseAt = Date.now();
-  renderDurationTick();
-  if (durationTimer) clearInterval(durationTimer);
-  durationTimer = setInterval(renderDurationTick, 1000);
+function syncDuration(baseSeconds = 0, cameraOn = false) {
+  const nextBase = Math.max(0, Number(baseSeconds || 0));
+  if (Math.abs(nextBase - durationBaseSeconds) >= 2 || durationCameraOn !== !!cameraOn) {
+    durationBaseSeconds = nextBase;
+    durationBaseAt = Date.now();
+  }
+  durationCameraOn = !!cameraOn;
+  document.getElementById('todayDuration').textContent = formatDuration(durationBaseSeconds * 1000);
+  if (!durationTimer) durationTimer = setInterval(renderDurationTick, 1000);
 }
 
 function drawBoxes(boxes = []) {
@@ -98,8 +102,11 @@ async function refreshSystem() {
   document.getElementById('cfgMeta1').textContent = `波特率：${cfg.baudrate || '-'} | 曝光：${cfg.exposure || '-'} | 增益：${cfg.gain || '-'}`;
   document.getElementById('cfgMeta2').textContent = `超时：${cfg.serial_timeout || '-'}ms | 自动白平衡：${cfg.auto_white_balance ? '开' : '关'} | 镜像：${cfg.flip_horizontal ? 'H' : '-'}${cfg.flip_vertical ? 'V' : '-'}`;
 
-  syncDuration(data.today_detection_seconds || 0);
+  syncDuration(data.today_detection_seconds || 0, data.camera_on);
+  await ensureCameraPreview(data);
+  ensureDetectionPolling(data.camera_on && data.detection_on);
 }
+
 
 async function pollDetection() {
   const data = await fetch('/api/detection/frame-data').then((r) => r.json());
@@ -132,6 +139,62 @@ async function pollOpenmvFrames() {
   openmvImage.src = `data:image/jpeg;base64,${data.frame}`;
   const target = document.getElementById('openmvTarget').value.trim() || '-';
   openmvConnStatus.textContent = `连接状态：已连接 | 视频端口：${target} | RX=${data.len}`;
+}
+
+
+
+async function ensureCameraPreview(data) {
+  if (!data.camera_on) {
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop());
+      stream = null;
+    }
+    video.classList.remove('d-none');
+    openmvImage.classList.add('d-none');
+    if (frameTimer) {
+      clearInterval(frameTimer);
+      frameTimer = null;
+    }
+    return;
+  }
+
+  if (data.camera_type === 'local') {
+    openmvImage.classList.add('d-none');
+    video.classList.remove('d-none');
+    if (!stream) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+      } catch (e) {
+        statusText.textContent = '状态：无法恢复本地摄像头画面（请检查权限）';
+      }
+    }
+    if (frameTimer) {
+      clearInterval(frameTimer);
+      frameTimer = null;
+    }
+  } else {
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop());
+      stream = null;
+    }
+    video.classList.add('d-none');
+    openmvImage.classList.remove('d-none');
+    if (!frameTimer) frameTimer = setInterval(pollOpenmvFrames, 500);
+    pollOpenmvFrames();
+  }
+}
+
+function ensureDetectionPolling(enabled) {
+  if (enabled && !timer) {
+    timer = setInterval(pollDetection, 1200);
+    pollDetection();
+  }
+  if (!enabled && timer) {
+    clearInterval(timer);
+    timer = null;
+    drawBoxes([]);
+  }
 }
 
 cameraType.onchange = () => {

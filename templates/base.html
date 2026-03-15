@@ -15,7 +15,6 @@
     <a href="{{ url_for('monitor') }}" class="nav-link {% if request.path.startswith('/monitor') %}active{% endif %}">实时监控</a>
     <a href="{{ url_for('stats_page') }}" class="nav-link {% if request.path.startswith('/stats') %}active{% endif %}">数据统计</a>
     <a href="{{ url_for('history_page') }}" class="nav-link {% if request.path.startswith('/history') %}active{% endif %}">历史记录</a>
-    <a href="{{ url_for('raw_data_page') }}" class="nav-link {% if request.path.startswith('/raw-data') %}active{% endif %}">原始数据</a>
     {% if current_user.is_admin %}
     <a href="{{ url_for('admin_page') }}" class="nav-link {% if request.path.startswith('/admin') %}active{% endif %}">系统设置</a>
     {% endif %}
@@ -32,8 +31,11 @@
     {% endif %}
     {% if current_user.is_authenticated %}
     <div class="topbar-meta mb-3">
-      <span class="badge text-bg-dark" id="globalCameraStatus">摄像头：未连接</span>
-      <span class="badge text-bg-light" id="bjClock">--</span>
+      <div class="d-flex align-items-center gap-2">
+        <img id="globalAvatar" class="topbar-avatar d-none" alt="用户头像">
+        <span class="badge text-bg-dark" id="globalCameraStatus">摄像头：未连接</span>
+        <span class="badge text-bg-light" id="bjClock">--</span>
+      </div>
     </div>
     {% endif %}
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -92,6 +94,28 @@ async function refreshGlobalStatus() {
   }
 }
 
+
+
+async function refreshGlobalAvatar() {
+  const el = document.getElementById('globalAvatar');
+  if (!el) return;
+  try {
+    const res = await fetch('/api/account/me');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.ok) return;
+    const avatar = data.user?.avatar_url || '';
+    if (avatar) {
+      el.src = avatar;
+      el.classList.remove('d-none');
+    } else {
+      el.classList.add('d-none');
+    }
+  } catch (e) {
+    el.classList.add('d-none');
+  }
+}
+
 function startBjClock() {
   const el = document.getElementById('bjClock');
   if (!el) return;
@@ -109,6 +133,7 @@ function startBjClock() {
 
 startBjClock();
 refreshGlobalStatus();
+refreshGlobalAvatar();
 setInterval(refreshGlobalStatus, 3000);
 </script>
 {% block scripts %}{% endblock %}
