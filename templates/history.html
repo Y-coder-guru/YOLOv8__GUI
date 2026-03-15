@@ -1,26 +1,29 @@
 {% extends 'base.html' %}
-{% block title %}历史记录{% endblock %}
+{% block title %}检测记录{% endblock %}
 {% block content %}
-<h2 class="mb-3">历史检测记录</h2>
-<div class="card p-3 mb-3">
-  <div class="row g-2 align-items-end history-filter-row">
-    <div class="col-xl-2 col-md-4"><label class="form-label">关键词</label><input class="form-control" id="keyword" placeholder="类别/备注"></div>
-    <div class="col-xl-2 col-md-4"><label class="form-label">类别</label><input class="form-control" id="category" placeholder="如 person"></div>
-    <div class="col-xl-2 col-md-4"><label class="form-label">状态</label><input class="form-control" id="status" placeholder="如 目标检测"></div>
-    <div class="col-xl-2 col-md-4"><label class="form-label">开始时间</label><input class="form-control" type="datetime-local" step="1" id="startTime"></div>
-    <div class="col-xl-2 col-md-4"><label class="form-label">结束时间</label><input class="form-control" type="datetime-local" step="1" id="endTime"></div>
-    <div class="col-12">
-      <div class="history-actions-wrap d-flex justify-content-between flex-wrap gap-2">
-        <div class="d-flex gap-2 flex-wrap">
-          <button class="btn btn-primary uniform-btn" id="searchBtn">筛选</button>
-          <button class="btn btn-outline-secondary uniform-btn" id="resetBtn">重置筛选</button>
-        </div>
-        <div class="d-flex gap-2 flex-wrap">
-          <button class="btn btn-outline-secondary uniform-btn" id="exportCsvBtn">导出 CSV</button>
-          <button class="btn btn-outline-secondary uniform-btn" id="exportExcelBtn">导出 Excel</button>
-          <button class="btn btn-outline-secondary uniform-btn" id="exportJsonBtn">导出 JSON</button>
-        </div>
+<h2 class="mb-3">检测记录</h2>
+<div class="card p-3 mb-3 two-column-card history-filter-row">
+  <div>
+    <h6 class="mb-2">筛选区域</h6>
+    <div class="row g-2 align-items-end">
+      <div class="col-xl-4 col-md-6"><label class="form-label">关键词</label><input class="form-control" id="keyword" placeholder="类别/备注"></div>
+      <div class="col-xl-4 col-md-6"><label class="form-label">类别</label><input class="form-control" id="category" placeholder="如 person"></div>
+      <div class="col-xl-4 col-md-6"><label class="form-label">状态</label><input class="form-control" id="status" placeholder="如 目标检测"></div>
+      <div class="col-xl-6 col-md-6"><label class="form-label">开始时间</label><input class="form-control" type="datetime-local" step="1" id="startTime"></div>
+      <div class="col-xl-6 col-md-6"><label class="form-label">结束时间</label><input class="form-control" type="datetime-local" step="1" id="endTime"></div>
+      <div class="col-12 d-flex gap-2 flex-wrap mt-1">
+        <button class="btn btn-primary uniform-btn" id="searchBtn">筛选</button>
+        <button class="btn btn-outline-secondary uniform-btn" id="resetBtn">重置筛选</button>
       </div>
+    </div>
+  </div>
+  <div class="export-panel">
+    <h6 class="mb-2">导出区域</h6>
+    <p class="small text-muted mb-2">按当前筛选范围导出检测记录。</p>
+    <div class="d-grid gap-2">
+      <button class="btn btn-outline-secondary uniform-btn" id="exportCsvBtn">导出 CSV</button>
+      <button class="btn btn-outline-secondary uniform-btn" id="exportExcelBtn">导出 Excel</button>
+      <button class="btn btn-outline-secondary uniform-btn" id="exportJsonBtn">导出 JSON</button>
     </div>
   </div>
 </div>

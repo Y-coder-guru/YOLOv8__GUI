@@ -7,6 +7,11 @@ function selectedCategory() {
   return document.getElementById('categoryFilter').value;
 }
 
+function togglePlaceholder(id, show, chartId) {
+  document.getElementById(id).classList.toggle('d-none', !show);
+  document.getElementById(chartId).style.display = show ? 'none' : 'block';
+}
+
 function getRangePayload() {
   return {
     range: document.getElementById('rangeType').value,
@@ -17,6 +22,11 @@ function getRangePayload() {
 }
 
 function applyLine(timeline = []) {
+  if (!timeline.length) {
+    togglePlaceholder('linePlaceholder', true, 'lineChart');
+    return;
+  }
+  togglePlaceholder('linePlaceholder', false, 'lineChart');
   lineChart.setOption({
     tooltip: { trigger: 'axis' },
     dataZoom: [{ type: 'inside' }, { type: 'slider' }],
@@ -25,47 +35,52 @@ function applyLine(timeline = []) {
     series: [{
       name: '数量', type: 'line', smooth: true,
       data: timeline.map((x) => x.value),
-      symbolSize: 8,
+      symbolSize: 7,
       areaStyle: {
         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: 'rgba(31,119,255,0.45)' },
-          { offset: 1, color: 'rgba(31,119,255,0.05)' },
+          { offset: 0, color: 'rgba(79,70,229,0.45)' },
+          { offset: 1, color: 'rgba(79,70,229,0.05)' },
         ]),
       },
-      lineStyle: { width: 3, color: '#1f77ff' },
+      lineStyle: { width: 3, color: '#4f46e5' },
     }],
   });
 }
 
-function applyCategoryBars(pie = []) {
-  const sorted = [...pie].sort((a, b) => b.value - a.value);
+function applyPie(pie = []) {
+  if (!pie.length) {
+    togglePlaceholder('piePlaceholder', true, 'pieChart');
+    return;
+  }
+  togglePlaceholder('piePlaceholder', false, 'pieChart');
   pieChart.setOption({
+    tooltip: { trigger: 'item' },
+    legend: { bottom: 0 },
+    series: [{
+      type: 'pie',
+      radius: ['38%', '70%'],
+      data: pie,
+      label: { formatter: '{b}: {d}%' },
+    }],
+  });
+}
+
+function applyBars(bar = []) {
+  if (!bar.length) {
+    togglePlaceholder('barPlaceholder', true, 'barChart');
+    return;
+  }
+  togglePlaceholder('barPlaceholder', false, 'barChart');
+  const sorted = [...bar].sort((a, b) => b.value - a.value);
+  barChart.setOption({
     tooltip: { trigger: 'axis' },
-    xAxis: { type: 'value' },
-    yAxis: { type: 'category', data: sorted.map((x) => x.name) },
+    xAxis: { type: 'category', data: sorted.map((x) => x.name) },
+    yAxis: { type: 'value' },
     series: [{
       type: 'bar',
       data: sorted.map((x) => x.value),
-      label: { show: true, position: 'right' },
-      itemStyle: { color: '#36a2eb', borderRadius: [0, 8, 8, 0] },
-    }],
-  });
-}
-
-function applyRadar(bar = []) {
-  const maxVal = Math.max(5, ...bar.map((x) => x.value));
-  barChart.setOption({
-    tooltip: {},
-    radar: {
-      indicator: bar.map((x) => ({ name: x.name, max: maxVal })),
-      radius: '70%',
-    },
-    series: [{
-      type: 'radar',
-      data: [{ value: bar.map((x) => x.value), name: '类别分布' }],
-      areaStyle: { opacity: 0.25 },
-      lineStyle: { width: 2, color: '#8e44ad' },
-      itemStyle: { color: '#8e44ad' },
+      label: { show: true, position: 'top' },
+      itemStyle: { color: '#36a2eb', borderRadius: [8, 8, 0, 0] },
     }],
   });
 }
@@ -95,9 +110,9 @@ async function refreshAdvanced() {
     cate.innerHTML = '<option value="">全部类别</option>' + allCategories.map((x) => `<option value="${x}">${x}</option>`).join('');
   }
 
-  applyLine(data.timeline);
-  applyCategoryBars(data.pie);
-  applyRadar(data.bar);
+  applyLine(data.timeline || []);
+  applyPie(data.pie || []);
+  applyBars(data.bar || []);
 }
 
 document.getElementById('refreshBtn').onclick = async () => {
@@ -110,7 +125,6 @@ document.getElementById('categoryFilter').onchange = refreshAdvanced;
 document.getElementById('rangeType').onchange = refreshAdvanced;
 document.getElementById('startTime').onchange = refreshAdvanced;
 document.getElementById('endTime').onchange = refreshAdvanced;
-
 
 document.getElementById('clearDataBtn').onclick = async () => {
   const res = await fetch('/api/admin/history', { method: 'DELETE' });

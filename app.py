@@ -463,6 +463,7 @@ def logout():
 
 
 @app.route("/relogin")
+@login_required
 def relogin():
     if current_user.is_authenticated:
         if runtime_state["camera_started_at"]:
@@ -475,6 +476,27 @@ def relogin():
         add_log("auth", f"用户重新登录: {current_user.username}", current_user.id)
         logout_user()
     return redirect(url_for("login"))
+
+
+@app.post("/api/auth/logout")
+@login_required
+def api_logout():
+    add_log("auth", f"用户退出: {current_user.username}", current_user.id)
+    if runtime_state["camera_started_at"]:
+        add_duration_seconds(datetime.utcfromtimestamp(runtime_state["camera_started_at"]), datetime.utcnow())
+    runtime_state["camera_on"] = False
+    runtime_state["detection_on"] = False
+    runtime_state["camera_state"] = "未连接"
+    runtime_state["openmv_connected"] = False
+    runtime_state["camera_started_at"] = None
+    logout_user()
+    return jsonify({"ok": True, "redirect": url_for("login")})
+
+
+@app.post("/api/auth/relogin")
+@login_required
+def api_relogin():
+    return api_logout()
 
 
 @app.route("/profile")
