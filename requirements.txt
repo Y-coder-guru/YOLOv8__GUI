@@ -4,3 +4,4 @@ Flask-SQLAlchemy==3.1.1
 Werkzeug==3.0.3
 pyserial==3.5
 ultralytics==8.3.0
+gunicorn
