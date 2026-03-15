@@ -2,6 +2,7 @@ const userList = document.getElementById('userList');
 const logList = document.getElementById('logList');
 let logOffset = 0;
 const logPageSize = 20;
+
 let canManageUsers = false;
 const userManageSection = document.getElementById('userManageSection');
 
@@ -12,12 +13,14 @@ if (!userList || !logList) {
 async function syncPermission() {
   try {
     const res = await fetch('/api/account/me');
+
     if (!res.ok) {
       canManageUsers = false;
     } else {
       const data = await res.json();
       canManageUsers = !!data.user?.is_admin;
     }
+
   } catch (e) {
     canManageUsers = false;
   }
@@ -26,6 +29,7 @@ async function syncPermission() {
     createBtn.disabled = !canManageUsers;
     createBtn.title = canManageUsers ? '' : '普通用户无权限执行此操作';
   }
+
   if (userManageSection) {
     userManageSection.classList.toggle('d-none', !canManageUsers);
   }
@@ -46,6 +50,7 @@ async function refreshCameraStatus() {
     el.classList.remove('text-success');
     el.classList.add('text-secondary');
   }
+
 }
 
 async function refreshAdmin() {
@@ -207,6 +212,7 @@ document.getElementById('nextLogPage').onclick = () => {
   refreshAdmin();
 };
 
+
 if (userList && logList) {
   syncPermission();
   refreshCameraStatus();
@@ -215,3 +221,4 @@ if (userList && logList) {
   setInterval(() => refreshAdmin(), 5000);
   setInterval(refreshCameraStatus, 3000);
 }
+

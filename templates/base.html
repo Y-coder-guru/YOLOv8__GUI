@@ -11,7 +11,9 @@
 <div class="d-flex" id="layoutWrapper">
   {% if current_user.is_authenticated %}
   <aside class="sidebar p-3 page-transition" id="appSidebar">
+
     <button class="btn btn-sm sidebar-toggle-btn" id="sidebarToggleBtn" title="折叠侧边栏" aria-label="折叠侧边栏" type="button"><span class="sidebar-toggle-icon">☰</span></button>
+
     <h4 class="mb-4 mt-2 sidebar-brand">YOLOv8 GUI</h4>
     <a href="{{ url_for('monitor') }}" class="nav-link {% if request.path.startswith('/monitor') %}active{% endif %}"><span class="nav-icon">📷</span><span class="nav-text">实时监控</span></a>
     <a href="{{ url_for('stats_page') }}" class="nav-link {% if request.path.startswith('/stats') %}active{% endif %}"><span class="nav-icon">📊</span><span class="nav-text">数据统计</span></a>
