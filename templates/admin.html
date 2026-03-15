@@ -10,8 +10,9 @@
 </div>
 
 <div class="card p-3 mt-3 panel-anim">
-  <h5>摄像头快捷配置</h5>
+  <h5>摄像头配置</h5>
   <div class="row g-2 align-items-end">
+    <div class="col-md-2"><label class="form-label">摄像头 ID</label><input class="form-control" type="number" id="cfgCameraId" value="0" min="0"></div>
     <div class="col-md-2"><label class="form-label">摄像头类型</label><select class="form-select" id="cfgCameraType"><option value="local">本地</option><option value="openmv">OpenMV</option></select></div>
     <div class="col-md-2"><label class="form-label">分辨率</label><select class="form-select" id="cfgRes"><option>720P</option><option>1080P</option></select></div>
     <div class="col-md-2"><label class="form-label">帧率</label><select class="form-select" id="cfgFps"><option>15</option><option>30</option></select></div>
@@ -27,7 +28,7 @@
 </div>
 
 <div class="row g-3 mt-4">
-  <div class="col-lg-6 admin-users-col">
+  <div class="col-lg-6">
     <div class="card p-3 h-100">
       <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
         <h5 class="mb-0">用户管理</h5>
@@ -36,7 +37,7 @@
       <ul class="list-group" id="userList"></ul><div id="userEmpty" class="small text-muted mt-2 d-none">暂无用户数据</div>
     </div>
   </div>
-  <div class="col-lg-6 admin-logs-col">
+  <div class="col-lg-6">
     <div class="card p-3 h-100">
       <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
         <h5 class="mb-0">系统日志</h5>

@@ -12,7 +12,7 @@ async function refreshAdmin() {
   animateNumber(document.getElementById('mUser'), data.metrics.user_count);
   animateNumber(document.getElementById('mHistory'), data.metrics.history_total);
   document.getElementById('mHistoryDesc').textContent = data.metrics.history_total_desc;
-  document.getElementById('mCamera').textContent = data.metrics.camera_on ? '在线' : '离线';
+  document.getElementById('mCamera').textContent = data.metrics.camera_state || '未连接';
   animateNumber(document.getElementById('mLogs'), data.metrics.today_logs);
 
   userList.innerHTML = "";
@@ -96,6 +96,7 @@ document.getElementById('openCreateUser').onclick = async () => {
 
 document.getElementById('saveOpenmvCfg').onclick = async () => {
   const payload = {
+    camera_id: Number(document.getElementById('cfgCameraId').value || 0),
     resolution: document.getElementById('cfgRes').value,
     fps: Number(document.getElementById('cfgFps').value || 15),
     baudrate: Number(document.getElementById('cfgBaud').value || 115200),
@@ -114,6 +115,24 @@ document.getElementById('saveOpenmvCfg').onclick = async () => {
   if (res.ok) showToast('摄像头配置已保存并实时生效');
 };
 
+async function loadCameraConfig() {
+  const res = await fetch('/api/system/status');
+  const data = await res.json();
+  if (!data.ok) return;
+  const cfg = data.openmv_settings || {};
+  document.getElementById('cfgCameraType').value = data.camera_type || 'local';
+  document.getElementById('cfgCameraId').value = cfg.camera_id ?? 0;
+  document.getElementById('cfgRes').value = cfg.resolution || '720P';
+  document.getElementById('cfgFps').value = cfg.fps || 15;
+  document.getElementById('cfgBaud').value = cfg.baudrate || 115200;
+  document.getElementById('cfgExposure').value = cfg.exposure ?? 50;
+  document.getElementById('cfgGain').value = cfg.gain ?? 1.0;
+  document.getElementById('cfgTimeout').value = cfg.serial_timeout || 800;
+  document.getElementById('cfgAwb').checked = !!cfg.auto_white_balance;
+  document.getElementById('cfgFlipH').checked = !!cfg.flip_horizontal;
+  document.getElementById('cfgFlipV').checked = !!cfg.flip_vertical;
+}
+
 document.getElementById('logOperator').oninput = () => {
   logOffset = 0;
   refreshAdmin();
@@ -128,4 +147,5 @@ document.getElementById('nextLogPage').onclick = () => {
 };
 
 refreshAdmin();
+loadCameraConfig();
 setInterval(() => refreshAdmin(), 5000);

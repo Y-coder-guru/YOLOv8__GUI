@@ -39,11 +39,12 @@
     <div class="topbar-meta mb-3">
       <div class="d-flex align-items-center gap-2 topbar-left">
         <button class="btn btn-sm btn-outline-secondary" id="sidebarToggleBtn" title="折叠侧边栏">☰</button>
-        <h4 class="mb-0 topbar-title">实时控制中心</h4>
+        <span class="badge text-bg-dark" id="globalCameraStatus">摄像头状态：未连接</span>
+      </div>
+      <div class="d-flex align-items-center justify-content-center topbar-center">
+        <span class="badge text-bg-light" id="bjClock">--</span>
       </div>
       <div class="d-flex align-items-center gap-2 topbar-right">
-        <span class="badge text-bg-light" id="bjClock">--</span>
-        <span class="badge text-bg-dark" id="globalCameraStatus">连接状态：未连接</span>
         <img id="globalAvatar" class="topbar-avatar" alt="用户头像">
         <span id="globalUserName" class="small fw-semibold text-secondary">当前用户</span>
       </div>
@@ -100,10 +101,10 @@ async function refreshGlobalStatus() {
     const text = data.camera_state || '未连接';
     const sb = document.getElementById('sidebarSystemState');
     if (sb) sb.textContent = data.camera_on ? `${text} · 监控中` : '待机';
-    el.textContent = `连接状态：${text}`;
+    el.textContent = `摄像头状态：${text}`;
     el.className = `badge ${text === '已连接' ? 'text-bg-success' : text === '连接中' ? 'text-bg-warning' : 'text-bg-dark'}`;
   } catch (e) {
-    el.textContent = '连接状态：异常';
+    el.textContent = '摄像头状态：异常';
   }
 }
 

@@ -9,7 +9,7 @@ function getFilters() {
   return {
     keyword,
     category: document.getElementById('category').value.trim(),
-    status: document.getElementById('status').value.trim(),
+    note: document.getElementById('note').value.trim(),
     start_time: document.getElementById('startTime').value,
     end_time: document.getElementById('endTime').value,
     page,
@@ -19,7 +19,7 @@ function getFilters() {
 
 function getExportUrl(format) {
   const f = getFilters();
-  return `/api/stats/export?format=${format}&keyword=${encodeURIComponent(f.keyword)}&category=${encodeURIComponent(f.category)}&status=${encodeURIComponent(f.status)}&start_time=${encodeURIComponent(f.start_time)}&end_time=${encodeURIComponent(f.end_time)}`;
+  return `/api/stats/export?format=${format}&keyword=${encodeURIComponent(f.keyword)}&category=${encodeURIComponent(f.category)}&note=${encodeURIComponent(f.note)}&start_time=${encodeURIComponent(f.start_time)}&end_time=${encodeURIComponent(f.end_time)}`;
 }
 
 async function showDetail(id) {
@@ -72,7 +72,7 @@ async function loadHistory() {
 
 document.getElementById('searchBtn').onclick = () => { page = 1; loadHistory(); };
 document.getElementById('resetBtn').onclick = () => {
-  ['keyword', 'category', 'status', 'startTime', 'endTime'].forEach((id) => (document.getElementById(id).value = ''));
+  ['keyword', 'category', 'note', 'startTime', 'endTime'].forEach((id) => (document.getElementById(id).value = ''));
   page = 1;
   loadHistory();
 };

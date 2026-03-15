@@ -35,6 +35,7 @@ from flask_login import (
 )
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, inspect, text
+from sqlalchemy.orm import Session
 
 try:
     import serial
@@ -75,9 +76,10 @@ app.config.update(
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     SQLALCHEMY_ENGINE_OPTIONS={
         "pool_pre_ping": True,
-        "pool_recycle": int(os.getenv("SQLALCHEMY_POOL_RECYCLE", "300")),
-        "pool_size": int(os.getenv("SQLALCHEMY_POOL_SIZE", "1")),
-        "max_overflow": int(os.getenv("SQLALCHEMY_MAX_OVERFLOW", "2")),
+        # Render 免费实例连接数有限，保持小池并及时回收，防止 QueuePool 耗尽。
+        "pool_recycle": int(os.getenv("SQLALCHEMY_POOL_RECYCLE", "180")),
+        "pool_size": int(os.getenv("SQLALCHEMY_POOL_SIZE", "2")),
+        "max_overflow": int(os.getenv("SQLALCHEMY_MAX_OVERFLOW", "3")),
         "pool_timeout": int(os.getenv("SQLALCHEMY_POOL_TIMEOUT", "15")),
         "pool_use_lifo": True,
     }
@@ -145,7 +147,7 @@ class DailyDetectionDuration(db.Model):
 
 @login_manager.user_loader
 def load_user(user_id: str):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 
 class YoloModelService:
@@ -229,6 +231,7 @@ runtime_state = {
 openmv_serial_conn = None
 
 openmv_settings = {
+    "camera_id": 0,
     "resolution": "720P",
     "fps": 15,
     "baudrate": 115200,
@@ -262,29 +265,33 @@ def add_log(log_type: str, content: str, user_id: int | None = None, result: str
     operator = "system"
     ip = request.remote_addr if has_request_context() else "-"
     try:
-        if user_id:
-            user = User.query.get(user_id)
-            if user:
-                operator = user.username
-        db.session.add(SystemLog(log_type=log_type, content=content, user_id=user_id, operator=operator, ip=ip or "-", result=result))
-        db.session.commit()
+        with Session(db.engine, expire_on_commit=False) as local_session:
+            if user_id:
+                user = local_session.get(User, user_id)
+                if user:
+                    operator = user.username
+            local_session.add(
+                SystemLog(log_type=log_type, content=content, user_id=user_id, operator=operator, ip=ip or "-", result=result)
+            )
+            local_session.commit()
     except Exception:
-        db.session.rollback()
         app.logger.exception("写入系统日志失败: %s", content)
 
 
 def set_config_json(key: str, value: dict):
-    record = db.session.get(SystemConfig, key)
     payload = json.dumps(value, ensure_ascii=False)
-    if record:
-        record.value = payload
-    else:
-        db.session.add(SystemConfig(key=key, value=payload))
-    db.session.commit()
+    with Session(db.engine, expire_on_commit=False) as local_session:
+        record = local_session.get(SystemConfig, key)
+        if record:
+            record.value = payload
+        else:
+            local_session.add(SystemConfig(key=key, value=payload))
+        local_session.commit()
 
 
 def get_config_json(key: str, default: dict):
-    record = db.session.get(SystemConfig, key)
+    with Session(db.engine, expire_on_commit=False) as local_session:
+        record = local_session.get(SystemConfig, key)
     if not record:
         return default
     try:
@@ -299,28 +306,30 @@ def get_config_json(key: str, default: dict):
 def add_duration_seconds(start_dt: datetime, end_dt: datetime):
     if end_dt <= start_dt:
         return
-    cursor = start_dt
-    while cursor < end_dt:
-        cursor_bjt = to_bjt(cursor)
-        next_day_bjt = datetime(cursor_bjt.year, cursor_bjt.month, cursor_bjt.day) + timedelta(days=1)
-        next_day_utc = next_day_bjt - timedelta(hours=8)
-        seg_end = min(end_dt, next_day_utc)
-        seg_seconds = int((seg_end - cursor).total_seconds())
-        day_key = cursor_bjt.strftime("%Y-%m-%d")
-        rec = db.session.get(DailyDetectionDuration, day_key)
-        if not rec:
-            rec = DailyDetectionDuration(day=day_key, seconds=0)
-            db.session.add(rec)
-        rec.seconds += max(seg_seconds, 0)
-        cursor = seg_end
-    db.session.commit()
+    with Session(db.engine, expire_on_commit=False) as local_session:
+        cursor = start_dt
+        while cursor < end_dt:
+            cursor_bjt = to_bjt(cursor)
+            next_day_bjt = datetime(cursor_bjt.year, cursor_bjt.month, cursor_bjt.day) + timedelta(days=1)
+            next_day_utc = next_day_bjt - timedelta(hours=8)
+            seg_end = min(end_dt, next_day_utc)
+            seg_seconds = int((seg_end - cursor).total_seconds())
+            day_key = cursor_bjt.strftime("%Y-%m-%d")
+            rec = local_session.get(DailyDetectionDuration, day_key)
+            if not rec:
+                rec = DailyDetectionDuration(day=day_key, seconds=0)
+                local_session.add(rec)
+            rec.seconds += max(seg_seconds, 0)
+            cursor = seg_end
+        local_session.commit()
 
 
 def get_today_detection_seconds() -> int:
     now = datetime.utcnow()
     now_bjt = to_bjt(now)
     day_key = now_bjt.strftime("%Y-%m-%d")
-    rec = db.session.get(DailyDetectionDuration, day_key)
+    with Session(db.engine, expire_on_commit=False) as local_session:
+        rec = local_session.get(DailyDetectionDuration, day_key)
     total = rec.seconds if rec else 0
     if runtime_state["camera_on"] and runtime_state["camera_started_at"]:
         start_ts = runtime_state["camera_started_at"]
@@ -673,6 +682,7 @@ def openmv_disconnect():
 @login_required
 def update_openmv_settings():
     payload = request.get_json(silent=True) or {}
+    openmv_settings["camera_id"] = int(payload.get("camera_id", openmv_settings.get("camera_id", 0)))
     openmv_settings["resolution"] = payload.get("resolution", openmv_settings["resolution"])
     openmv_settings["fps"] = int(payload.get("fps", openmv_settings["fps"]))
     openmv_settings["baudrate"] = int(payload.get("baudrate", openmv_settings["baudrate"]))
@@ -885,7 +895,7 @@ def export_stats():
     query = DetectionRecord.query
     keyword = request.args.get("keyword", "").strip()
     category = request.args.get("category", "").strip()
-    status = request.args.get("status", "").strip()
+    note = request.args.get("note", "").strip()
     start_time = request.args.get("start_time", "").strip()
     end_time = request.args.get("end_time", "").strip()
 
@@ -893,8 +903,8 @@ def export_stats():
         query = query.filter((DetectionRecord.category.contains(keyword)) | (DetectionRecord.note.contains(keyword)))
     if category:
         query = query.filter_by(category=category)
-    if status:
-        query = query.filter_by(operation_type=status)
+    if note:
+        query = query.filter(DetectionRecord.note.contains(note))
     if start_time:
         try:
             query = query.filter(DetectionRecord.detect_time >= datetime.fromisoformat(start_time))
@@ -962,7 +972,7 @@ def get_history():
     query = DetectionRecord.query
     keyword = request.args.get("keyword", "").strip()
     category = request.args.get("category", "").strip()
-    status = request.args.get("status", "").strip()
+    note = request.args.get("note", "").strip()
     start_time = request.args.get("start_time", "").strip()
     end_time = request.args.get("end_time", "").strip()
     page = max(int(request.args.get("page", 1)), 1)
@@ -972,8 +982,8 @@ def get_history():
         query = query.filter((DetectionRecord.category.contains(keyword)) | (DetectionRecord.note.contains(keyword)))
     if category:
         query = query.filter_by(category=category)
-    if status:
-        query = query.filter_by(operation_type=status)
+    if note:
+        query = query.filter(DetectionRecord.note.contains(note))
     if start_time:
         try:
             query = query.filter(DetectionRecord.detect_time >= datetime.fromisoformat(start_time))
