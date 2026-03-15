@@ -1,13 +1,19 @@
 const video = document.getElementById('video');
+const openmvImage = document.getElementById('openmvImage');
 const overlay = document.getElementById('overlay');
 const ctx = overlay.getContext('2d');
 const countList = document.getElementById('countList');
 const statusText = document.getElementById('statusText');
+const cameraMeta = document.getElementById('cameraMeta');
+const perfMeta = document.getElementById('perfMeta');
 const cameraType = document.getElementById('cameraType');
 const openmvPanel = document.getElementById('openmvPanel');
 const openmvConnStatus = document.getElementById('openmvConnStatus');
 let stream = null;
 let timer = null;
+let frameTimer = null;
+let lastFrameAt = 0;
+let startAt = null;
 
 async function postApi(url, payload) {
   const res = await fetch(url, {
@@ -19,8 +25,9 @@ async function postApi(url, payload) {
 }
 
 function drawBoxes(boxes = []) {
-  overlay.width = video.clientWidth;
-  overlay.height = video.clientHeight;
+  const target = cameraType.value === 'openmv' ? openmvImage : video;
+  overlay.width = target.clientWidth || video.clientWidth;
+  overlay.height = target.clientHeight || video.clientHeight;
   ctx.clearRect(0, 0, overlay.width, overlay.height);
   ctx.lineWidth = 2;
   ctx.font = '14px sans-serif';
@@ -51,6 +58,12 @@ function renderCounts(counts = {}) {
   });
 }
 
+async function refreshSystem() {
+  const res = await fetch('/api/system/status');
+  const data = await res.json();
+  document.getElementById('cameraStateMini').textContent = data.camera_state;
+}
+
 async function pollDetection() {
   const res = await fetch('/api/detection/frame-data');
   const data = await res.json();
@@ -61,6 +74,23 @@ async function pollDetection() {
   drawBoxes(data.boxes);
   renderCounts(data.counts);
   statusText.textContent = `状态：${data.detection_on ? '检测中' : '摄像头已开启'}`;
+
+  const stat = await fetch('/api/stats/live').then((r) => r.json());
+  cameraMeta.textContent = `类型: ${stat.cards.camera_type || '-'} | 分辨率: ${stat.cards.resolution || '-'} | 帧率: ${stat.cards.fps || '-'}fps`;
+  perfMeta.textContent = `推理耗时: ${stat.cards.inference_ms}ms | 今日总目标: ${stat.cards.today_total_detected}`;
+  document.getElementById('onlineUsers').textContent = stat.cards.active_users;
+  if (startAt) {
+    const mins = Math.floor((Date.now() - startAt) / 60000);
+    document.getElementById('todayDuration').textContent = `${mins} min`;
+  }
+}
+
+async function pollOpenmvFrames() {
+  const data = await fetch('/api/openmv/frame').then((r) => r.json()).catch(() => ({ ok: false }));
+  if (!data.ok) return;
+  lastFrameAt = Date.now();
+  openmvImage.src = `data:image/jpeg;base64,${data.frame}`;
+  openmvConnStatus.textContent = `连接状态：已连接 | RX=${data.len} | 帧头=${data.header} 帧尾=${data.footer}`;
 }
 
 cameraType.onchange = () => {
@@ -81,13 +111,15 @@ document.getElementById('scanPortBtn').onclick = async () => {
 document.getElementById('connectOpenmvBtn').onclick = async () => {
   const mode = document.getElementById('openmvMode').value;
   const target = document.getElementById('openmvTarget').value.trim();
+  const baudrate = Number(document.getElementById('baudrate').value || 115200);
   const data = await postApi('/api/openmv/connect', { mode, target });
+  await postApi('/api/openmv/settings', { baudrate });
   if (!data.ok) {
     openmvConnStatus.textContent = `连接状态：失败（${data.message || '未知错误'}）`;
     showToast('OpenMV 连接失败，请检查串口占用/网络连通性。', 'danger');
     return;
   }
-  openmvConnStatus.textContent = `连接状态：已连接 (${mode} ${target})`;
+  openmvConnStatus.textContent = `连接状态：连接中 (${mode} ${target}) 波特率=${baudrate}`;
   showToast('OpenMV 连接成功');
 };
 
@@ -102,6 +134,21 @@ document.getElementById('openCameraBtn').onclick = async () => {
     if (cameraType.value === 'local') {
       stream = await navigator.mediaDevices.getUserMedia({ video: true });
       video.srcObject = stream;
+      video.classList.remove('d-none');
+      openmvImage.classList.add('d-none');
+    } else {
+      video.classList.add('d-none');
+      openmvImage.classList.remove('d-none');
+      if (frameTimer) clearInterval(frameTimer);
+      frameTimer = setInterval(pollOpenmvFrames, 500);
+      lastFrameAt = Date.now();
+      setTimeout(async () => {
+        if (Date.now() - lastFrameAt >= 5000) {
+          await postApi('/api/openmv/disconnect');
+          await postApi('/api/camera/stop');
+          showToast('5 秒未收到图像，已自动断开。请检查波特率/USB 线/OpenMV 固件。', 'warning');
+        }
+      }, 5200);
     }
     const resp = await postApi('/api/camera/start', { camera_type: cameraType.value });
     if (!resp.ok) {
@@ -109,6 +156,7 @@ document.getElementById('openCameraBtn').onclick = async () => {
       showToast(resp.message || '摄像头开启失败', 'warning');
       return;
     }
+    startAt = Date.now();
     statusText.textContent = `状态：${cameraType.value === 'local' ? '本地摄像头已开启' : 'OpenMV 摄像头已开启'}`;
     showToast('摄像头已开启');
   } catch (e) {
@@ -122,7 +170,9 @@ document.getElementById('closeCameraBtn').onclick = async () => {
     stream = null;
   }
   if (timer) clearInterval(timer);
+  if (frameTimer) clearInterval(frameTimer);
   timer = null;
+  frameTimer = null;
   await postApi('/api/camera/stop');
   drawBoxes([]);
   renderCounts({});
@@ -152,13 +202,14 @@ document.getElementById('stopDetBtn').onclick = async () => {
 
 document.getElementById('fullscreenBtn').onclick = async () => {
   const wrap = document.getElementById('videoWrap');
+  const btn = document.getElementById('fullscreenBtn');
   if (!document.fullscreenElement) {
     await wrap.requestFullscreen();
+    btn.textContent = '📥';
   } else {
     await document.exitFullscreen();
+    btn.textContent = '📤';
   }
 };
 
-window.addEventListener('beforeunload', async () => {
-  if (timer) clearInterval(timer);
-});
+setInterval(refreshSystem, 2500);
