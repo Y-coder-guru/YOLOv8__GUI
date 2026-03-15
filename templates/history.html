@@ -4,17 +4,18 @@
 <h2 class="mb-3">历史检测记录</h2>
 <div class="card p-3 mb-3">
   <div class="row g-2">
-    <div class="col-md-3"><input class="form-control" id="keyword" placeholder="关键词（类别）"></div>
-    <div class="col-md-2"><input class="form-control" id="category" placeholder="精确类别"></div>
-    <div class="col-md-2"><input class="form-control" id="startTime" type="datetime-local"></div>
-    <div class="col-md-2"><input class="form-control" id="endTime" type="datetime-local"></div>
-    <div class="col-md-2"><button class="btn btn-primary w-100" id="searchBtn">搜索筛选</button></div>
-    <div class="col-md-1"><button class="btn btn-outline-secondary w-100" id="resetBtn">重置</button></div>
+    <div class="col-md-2"><input class="form-control" id="keyword" placeholder="关键词（设备/备注）"></div>
+    <div class="col-md-2"><input class="form-control" id="category" placeholder="类别"></div>
+    <div class="col-md-2"><input class="form-control" id="status" placeholder="状态(目标检测)"></div>
+    <div class="col-md-2"><input class="form-control" id="startTime" type="datetime-local" step="1"></div>
+    <div class="col-md-2"><input class="form-control" id="endTime" type="datetime-local" step="1"></div>
+    <div class="col-md-1"><button class="btn btn-primary w-100" id="searchBtn">筛选</button></div>
+    <div class="col-md-1"><button class="btn btn-outline-secondary w-100" id="resetBtn">重置筛选</button></div>
   </div>
 </div>
 <div class="card p-3 table-responsive">
   <table class="table table-striped" id="historyTable">
-    <thead><tr><th>ID</th><th>时间</th><th>类别</th><th>数量</th><th>置信度</th></tr></thead>
+    <thead><tr><th>ID</th><th>检测时间</th><th>目标类别</th><th>数量</th><th>操作人</th><th>操作类型</th><th>操作</th></tr></thead>
     <tbody></tbody>
   </table>
   <div class="d-flex justify-content-between align-items-center mt-2">
@@ -22,6 +23,15 @@
     <div class="btn-group">
       <button class="btn btn-sm btn-outline-primary" id="prevPage">上一页</button>
       <button class="btn btn-sm btn-outline-primary" id="nextPage">下一页</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="detailModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-slide">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">记录详情</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body" id="detailBody">加载中...</div>
     </div>
   </div>
 </div>

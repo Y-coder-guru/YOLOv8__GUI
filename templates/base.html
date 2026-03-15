@@ -15,12 +15,21 @@
     <a href="{{ url_for('monitor') }}" class="nav-link {% if request.path.startswith('/monitor') %}active{% endif %}">实时监控</a>
     <a href="{{ url_for('stats_page') }}" class="nav-link {% if request.path.startswith('/stats') %}active{% endif %}">数据统计</a>
     <a href="{{ url_for('history_page') }}" class="nav-link {% if request.path.startswith('/history') %}active{% endif %}">历史记录</a>
+    {% if current_user.is_admin %}
     <a href="{{ url_for('admin_page') }}" class="nav-link {% if request.path.startswith('/admin') %}active{% endif %}">系统设置</a>
+    {% endif %}
+    <a href="{{ url_for('profile_page') }}" class="nav-link {% if request.path.startswith('/profile') %}active{% endif %}">个人账户</a>
     <a href="{{ url_for('logout') }}" class="nav-link text-danger">退出登录</a>
   </aside>
   {% endif %}
 
   <main class="flex-grow-1 p-3 p-md-4 main-content page-transition">
+    {% if current_user.is_authenticated %}
+    <div class="topbar-meta mb-3">
+      <span class="badge text-bg-dark" id="globalCameraStatus">摄像头：未连接</span>
+      <span class="badge text-bg-light" id="bjClock">--</span>
+    </div>
+    {% endif %}
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for category, message in messages %}
       <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
@@ -61,6 +70,40 @@ function animateNumber(el, target, duration=700) {
   };
   requestAnimationFrame(step);
 }
+
+async function refreshGlobalStatus() {
+  const el = document.getElementById('globalCameraStatus');
+  if (!el) return;
+  try {
+    const res = await fetch('/api/system/status');
+    const data = await res.json();
+    if (!data.ok) return;
+    const text = data.camera_state || '未连接';
+    el.textContent = `摄像头：${text}`;
+    el.className = `badge ${text === '已连接' ? 'text-bg-success' : text === '连接中' ? 'text-bg-warning' : 'text-bg-dark'}`;
+  } catch (e) {
+    el.textContent = '摄像头：状态异常';
+  }
+}
+
+function startBjClock() {
+  const el = document.getElementById('bjClock');
+  if (!el) return;
+  const week = ['日', '一', '二', '三', '四', '五', '六'];
+  const tick = () => {
+    const now = new Date();
+    const bj = new Date(now.getTime() + (8 * 60 + now.getTimezoneOffset()) * 60 * 1000);
+    const pad = (n) => String(n).padStart(2, '0');
+    const s = `${bj.getFullYear()}-${pad(bj.getMonth()+1)}-${pad(bj.getDate())} ${pad(bj.getHours())}:${pad(bj.getMinutes())}:${pad(bj.getSeconds())} 星期${week[bj.getDay()]}`;
+    el.textContent = s;
+  };
+  tick();
+  setInterval(tick, 1000);
+}
+
+startBjClock();
+refreshGlobalStatus();
+setInterval(refreshGlobalStatus, 3000);
 </script>
 {% block scripts %}{% endblock %}
 </body>
