@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 
 import time
 import random
@@ -53,11 +54,34 @@ except ImportError:  # pragma: no cover
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "instance" / "yolo_monitor.db"
 
+
+def resolve_database_uri() -> str:
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    if database_url:
+        # Render/Heroku 历史上可能提供 postgres:// 前缀，SQLAlchemy 2 需要 postgresql://
+        if database_url.startswith("postgres://"):
+            return database_url.replace("postgres://", "postgresql://", 1)
+        return database_url
+    return f"sqlite:///{DB_PATH}"
+
+
+DB_URI = resolve_database_uri()
+IS_SQLITE = DB_URI.startswith("sqlite:")
+
 app = Flask(__name__)
 app.config.update(
-    SECRET_KEY="replace-this-with-a-long-random-secret",
-    SQLALCHEMY_DATABASE_URI=f"sqlite:///{DB_PATH}",
+    SECRET_KEY=os.getenv("SECRET_KEY", "replace-this-with-a-long-random-secret"),
+    SQLALCHEMY_DATABASE_URI=DB_URI,
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
+    SQLALCHEMY_ENGINE_OPTIONS={
+        "pool_pre_ping": True,
+        "pool_recycle": int(os.getenv("SQLALCHEMY_POOL_RECYCLE", "1800")),
+        "pool_size": int(os.getenv("SQLALCHEMY_POOL_SIZE", "5")),
+        "max_overflow": int(os.getenv("SQLALCHEMY_MAX_OVERFLOW", "10")),
+        "pool_timeout": int(os.getenv("SQLALCHEMY_POOL_TIMEOUT", "30")),
+    }
+    if not IS_SQLITE
+    else {},
     REMEMBER_COOKIE_DURATION=timedelta(days=180),
     REMEMBER_COOKIE_HTTPONLY=True,
     REMEMBER_COOKIE_SAMESITE="Lax",
@@ -391,6 +415,14 @@ def make_session_permanent():
         session.permanent = True
 
 
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    """确保每个请求结束后都释放 Session/连接，避免连接池耗尽。"""
+    if exception is not None:
+        db.session.rollback()
+    db.session.remove()
+
+
 @app.route("/")
 def index():
     if current_user.is_authenticated:
@@ -405,18 +437,24 @@ def login():
         password = request.form.get("password", "")
         remember = bool(request.form.get("remember", True))
 
-        user = User.query.filter_by(username=username).first()
-        if user and verify_password(user.password_hash, password):
-            if not user.is_active_account:
-                flash("账号已被禁用，请联系管理员", "danger")
-                return render_template("login.html")
-            login_user(user, remember=remember)
-            user.last_login_at = datetime.utcnow()
-            db.session.commit()
-            add_log("auth", f"用户登录: {username}", user.id)
-            return redirect(url_for("monitor"))
+        try:
+            user = User.query.filter_by(username=username).first()
+            if user and verify_password(user.password_hash, password):
+                if not user.is_active_account:
+                    flash("账号已被禁用，请联系管理员", "danger")
+                    return render_template("login.html")
 
-        flash("账号或密码错误", "danger")
+                login_user(user, remember=remember)
+                user.last_login_at = datetime.utcnow()
+                db.session.commit()
+                add_log("auth", f"用户登录: {username}", user.id)
+                return redirect(url_for("monitor"))
+
+            flash("账号或密码错误", "danger")
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("登录流程数据库操作失败")
+            flash("登录失败：数据库连接异常，请稍后重试", "danger")
     return render_template("login.html")
 
 
