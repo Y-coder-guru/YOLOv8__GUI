@@ -477,6 +477,12 @@ def history_page():
     return render_template("history.html")
 
 
+@app.route("/raw-data")
+@login_required
+def raw_data_page():
+    return render_template("raw_data.html")
+
+
 @app.route("/admin")
 @login_required
 def admin_page():
@@ -504,6 +510,7 @@ def system_status():
             "last_detection_time": runtime_state["last_detection_time"],
             "camera_started_at": runtime_state["camera_started_at"],
             "last_inference_ms": runtime_state["last_inference_ms"],
+            "today_detection_seconds": get_today_detection_seconds(),
 
             "server_time": bjt_now().strftime("%Y-%m-%d %H:%M:%S"),
         }

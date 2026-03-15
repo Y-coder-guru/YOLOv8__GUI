@@ -9,11 +9,13 @@ const perfMeta = document.getElementById('perfMeta');
 const cameraType = document.getElementById('cameraType');
 const openmvPanel = document.getElementById('openmvPanel');
 const openmvConnStatus = document.getElementById('openmvConnStatus');
+
 let stream = null;
 let timer = null;
 let frameTimer = null;
 let durationTimer = null;
-
+let durationBaseSeconds = 0;
+let durationBaseAt = Date.now();
 
 async function postApi(url, payload) {
   const res = await fetch(url, {
@@ -35,6 +37,14 @@ function formatDuration(ms) {
 function renderDurationTick() {
   const extra = Math.max(0, Math.floor((Date.now() - durationBaseAt) / 1000));
   document.getElementById('todayDuration').textContent = formatDuration((durationBaseSeconds + extra) * 1000);
+}
+
+function syncDuration(baseSeconds = 0) {
+  durationBaseSeconds = Math.max(0, Number(baseSeconds || 0));
+  durationBaseAt = Date.now();
+  renderDurationTick();
+  if (durationTimer) clearInterval(durationTimer);
+  durationTimer = setInterval(renderDurationTick, 1000);
 }
 
 function drawBoxes(boxes = []) {
@@ -70,9 +80,6 @@ function renderCounts(counts = {}) {
   });
 }
 
-
-}
-
 async function refreshSystem() {
   const data = await fetch('/api/system/status').then((r) => r.json());
   if (!data.ok) return;
@@ -83,20 +90,15 @@ async function refreshSystem() {
   const isOnline = data.camera_on && data.camera_state !== '未连接';
   document.getElementById('cameraStateMini').textContent = isOnline ? '在线' : '离线';
 
-
-  }
-
   statusText.textContent = `状态：${data.detection_on ? '运行中' : (data.camera_on ? '摄像头已开启' : '待机')}`;
   cameraMeta.textContent = `类型：${data.camera_type || '-'} | 分辨率：${data.openmv_settings?.resolution || '-'} | 帧率：${data.openmv_settings?.fps || '-'}fps`;
   perfMeta.textContent = `推理耗时：${data.last_inference_ms || '-'}ms`;
+
   const cfg = data.openmv_settings || {};
   document.getElementById('cfgMeta1').textContent = `波特率：${cfg.baudrate || '-'} | 曝光：${cfg.exposure || '-'} | 增益：${cfg.gain || '-'}`;
   document.getElementById('cfgMeta2').textContent = `超时：${cfg.serial_timeout || '-'}ms | 自动白平衡：${cfg.auto_white_balance ? '开' : '关'} | 镜像：${cfg.flip_horizontal ? 'H' : '-'}${cfg.flip_vertical ? 'V' : '-'}`;
 
-  if (data.camera_type === 'openmv') {
-    openmvPanel.classList.remove('d-none');
-  }
-  syncDuration();
+  syncDuration(data.today_detection_seconds || 0);
 }
 
 async function pollDetection() {
@@ -116,7 +118,7 @@ async function pollDetection() {
   perfMeta.textContent = `推理耗时：${Number(cards.inference_ms || 0).toFixed(2)}ms`;
   document.getElementById('onlineUsers').textContent = cards.active_users;
 
-  const cfg = stat.cards.openmv_settings || {};
+  const cfg = cards.openmv_settings || {};
   document.getElementById('cfgMeta1').textContent = `波特率：${cfg.baudrate || '-'} | 曝光：${cfg.exposure || '-'} | 增益：${cfg.gain || '-'}`;
   document.getElementById('cfgMeta2').textContent = `超时：${cfg.serial_timeout || '-'}ms | 自动白平衡：${cfg.auto_white_balance ? '开' : '关'} | 镜像：${cfg.flip_horizontal ? 'H' : '-'}${cfg.flip_vertical ? 'V' : '-'}`;
 }
@@ -245,7 +247,6 @@ document.getElementById('fullscreenBtn').onclick = async () => {
     btn.textContent = '📤';
   }
 };
-
 
 setInterval(refreshSystem, 2500);
 refreshSystem();

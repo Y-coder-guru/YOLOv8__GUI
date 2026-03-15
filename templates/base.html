@@ -15,6 +15,7 @@
     <a href="{{ url_for('monitor') }}" class="nav-link {% if request.path.startswith('/monitor') %}active{% endif %}">实时监控</a>
     <a href="{{ url_for('stats_page') }}" class="nav-link {% if request.path.startswith('/stats') %}active{% endif %}">数据统计</a>
     <a href="{{ url_for('history_page') }}" class="nav-link {% if request.path.startswith('/history') %}active{% endif %}">历史记录</a>
+    <a href="{{ url_for('raw_data_page') }}" class="nav-link {% if request.path.startswith('/raw-data') %}active{% endif %}">原始数据</a>
     {% if current_user.is_admin %}
     <a href="{{ url_for('admin_page') }}" class="nav-link {% if request.path.startswith('/admin') %}active{% endif %}">系统设置</a>
     {% endif %}
