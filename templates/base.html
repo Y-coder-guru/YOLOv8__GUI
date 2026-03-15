@@ -11,14 +11,15 @@
 <div class="d-flex" id="layoutWrapper">
   {% if current_user.is_authenticated %}
   <aside class="sidebar p-3 page-transition" id="appSidebar">
-    <h4 class="mb-4 sidebar-brand">YOLOv8 GUI</h4>
-    <a href="{{ url_for('monitor') }}" class="nav-link {% if request.path.startswith('/monitor') %}active{% endif %}">实时监控</a>
-    <a href="{{ url_for('stats_page') }}" class="nav-link {% if request.path.startswith('/stats') %}active{% endif %}">数据统计</a>
-    <a href="{{ url_for('history_page') }}" class="nav-link {% if request.path.startswith('/history') %}active{% endif %}">检测记录</a>
+    <button class="btn btn-sm btn-outline-light sidebar-toggle-btn" id="sidebarToggleBtn" title="折叠侧边栏" aria-label="折叠侧边栏">☰</button>
+    <h4 class="mb-4 mt-2 sidebar-brand">YOLOv8 GUI</h4>
+    <a href="{{ url_for('monitor') }}" class="nav-link {% if request.path.startswith('/monitor') %}active{% endif %}"><span class="nav-icon">📷</span><span class="nav-text">实时监控</span></a>
+    <a href="{{ url_for('stats_page') }}" class="nav-link {% if request.path.startswith('/stats') %}active{% endif %}"><span class="nav-icon">📊</span><span class="nav-text">数据统计</span></a>
+    <a href="{{ url_for('history_page') }}" class="nav-link {% if request.path.startswith('/history') %}active{% endif %}"><span class="nav-icon">🧾</span><span class="nav-text">检测记录</span></a>
     {% if current_user.is_admin %}
-    <a href="{{ url_for('admin_page') }}" class="nav-link {% if request.path.startswith('/admin') %}active{% endif %}">系统设置</a>
+    <a href="{{ url_for('admin_page') }}" class="nav-link {% if request.path.startswith('/admin') %}active{% endif %}"><span class="nav-icon">🛡️</span><span class="nav-text">系统设置</span></a>
     {% endif %}
-    <a href="{{ url_for('profile_page') }}" class="nav-link {% if request.path.startswith('/profile') %}active{% endif %}">个人账户</a>
+    <a href="{{ url_for('profile_page') }}" class="nav-link {% if request.path.startswith('/profile') %}active{% endif %}"><span class="nav-icon">👤</span><span class="nav-text">个人账户</span></a>
 
     <div class="sidebar-footer mt-auto pt-3">
       <div>版本：v1.2.0</div>
@@ -38,7 +39,6 @@
     {% if current_user.is_authenticated %}
     <div class="topbar-meta mb-3">
       <div class="d-flex align-items-center gap-2 topbar-left">
-        <button class="btn btn-sm btn-outline-secondary" id="sidebarToggleBtn" title="折叠侧边栏">☰</button>
         <span class="badge text-bg-dark" id="globalCameraStatus">摄像头状态：未连接</span>
       </div>
       <div class="d-flex align-items-center justify-content-center topbar-center">
@@ -155,7 +155,12 @@ function initSidebarToggle() {
   const btn = document.getElementById('sidebarToggleBtn');
   const wrapper = document.getElementById('layoutWrapper');
   if (!btn || !wrapper) return;
-  btn.onclick = () => wrapper.classList.toggle('sidebar-collapsed');
+  const stored = localStorage.getItem('sidebar-collapsed') === '1';
+  if (stored && window.innerWidth > 768) wrapper.classList.add('sidebar-collapsed');
+  btn.onclick = () => {
+    wrapper.classList.toggle('sidebar-collapsed');
+    localStorage.setItem('sidebar-collapsed', wrapper.classList.contains('sidebar-collapsed') ? '1' : '0');
+  };
 }
 
 startBjClock();
@@ -163,6 +168,7 @@ refreshGlobalStatus();
 refreshGlobalAvatar();
 initSidebarToggle();
 setInterval(refreshGlobalStatus, 3000);
+setInterval(refreshGlobalAvatar, 10000);
 </script>
 {% block scripts %}{% endblock %}
 </body>
