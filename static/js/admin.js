@@ -2,15 +2,18 @@ const userList = document.getElementById('userList');
 const logList = document.getElementById('logList');
 let logOffset = 0;
 const logPageSize = 20;
-let canManageUsers = true;
+let canManageUsers = false;
 const userManageSection = document.getElementById('userManageSection');
 
 async function syncPermission() {
   try {
     const res = await fetch('/api/account/me');
-    if (!res.ok) return;
-    const data = await res.json();
-    canManageUsers = !!data.user?.is_admin;
+    if (!res.ok) {
+      canManageUsers = false;
+    } else {
+      const data = await res.json();
+      canManageUsers = !!data.user?.is_admin;
+    }
   } catch (e) {
     canManageUsers = false;
   }
@@ -43,8 +46,18 @@ async function refreshCameraStatus() {
 
 async function refreshAdmin() {
   const operator = document.getElementById('logOperator').value.trim();
-  const res = await fetch(`/api/admin/overview?offset=${logOffset}&limit=${logPageSize}&operator=${encodeURIComponent(operator)}`);
-  const data = await res.json();
+  let data;
+  try {
+    const res = await fetch(`/api/admin/overview?offset=${logOffset}&limit=${logPageSize}&operator=${encodeURIComponent(operator)}`);
+    if (!res.ok) {
+      showToast('系统设置数据加载失败', 'danger');
+      return;
+    }
+    data = await res.json();
+  } catch (e) {
+    showToast('系统设置数据加载失败', 'danger');
+    return;
+  }
   if (!data.ok) { showToast(data.message || "系统设置数据加载失败", "danger"); return; }
 
   animateNumber(document.getElementById('mUser'), data.metrics.user_count);

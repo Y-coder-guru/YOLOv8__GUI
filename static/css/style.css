@@ -29,11 +29,11 @@ body {
   box-shadow: 12px 0 30px rgba(15, 23, 42, .16);
 }
 .sidebar-toggle-btn {
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
   padding: 0 !important;
   align-self: flex-start;
-  margin-bottom: 6px;
+  margin: 0 0 6px 1px;
   border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, .35);
   color: #cbd5e1;
@@ -62,7 +62,7 @@ body {
   align-items: center;
   gap: 10px;
   padding: 11px 12px;
-  margin-bottom: 6px;
+  margin: 0 0 6px 1px;
   border-radius: 10px;
   transition: all .2s ease;
 }
