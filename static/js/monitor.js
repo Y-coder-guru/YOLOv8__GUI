@@ -47,7 +47,7 @@ function syncDuration(baseSeconds = 0, cameraOn = false) {
     durationBaseAt = Date.now();
   }
   durationCameraOn = !!cameraOn;
-  document.getElementById('todayDuration').textContent = formatDuration(durationBaseSeconds * 1000);
+  renderDurationTick();
   if (!durationTimer) durationTimer = setInterval(renderDurationTick, 1000);
 }
 
@@ -57,7 +57,7 @@ function drawBoxes(boxes = []) {
   overlay.height = target.clientHeight || video.clientHeight;
   ctx.clearRect(0, 0, overlay.width, overlay.height);
   ctx.lineWidth = 2;
-  ctx.font = '14px sans-serif';
+  ctx.font = '13px sans-serif';
   boxes.forEach((b) => {
     ctx.strokeStyle = '#00e1ff';
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
@@ -84,6 +84,18 @@ function renderCounts(counts = {}) {
   });
 }
 
+function patchConfigInputs(cfg = {}) {
+  document.getElementById('cfgResolution').value = cfg.resolution || '720P';
+  document.getElementById('cfgFps').value = cfg.fps || 15;
+  document.getElementById('cfgExposure').value = cfg.exposure ?? 50;
+  document.getElementById('cfgGain').value = cfg.gain ?? 1;
+  document.getElementById('cfgBaudrate').value = cfg.baudrate || 115200;
+  document.getElementById('cfgTimeout').value = cfg.serial_timeout || 800;
+  document.getElementById('cfgAwb').checked = !!cfg.auto_white_balance;
+  document.getElementById('cfgFlipH').checked = !!cfg.flip_horizontal;
+  document.getElementById('cfgFlipV').checked = !!cfg.flip_vertical;
+}
+
 async function refreshSystem() {
   const data = await fetch('/api/system/status').then((r) => r.json());
   if (!data.ok) return;
@@ -99,6 +111,7 @@ async function refreshSystem() {
   perfMeta.textContent = `推理耗时：${data.last_inference_ms || '-'}ms`;
 
   const cfg = data.openmv_settings || {};
+  patchConfigInputs(cfg);
   document.getElementById('cfgMeta1').textContent = `波特率：${cfg.baudrate || '-'} | 曝光：${cfg.exposure || '-'} | 增益：${cfg.gain || '-'}`;
   document.getElementById('cfgMeta2').textContent = `超时：${cfg.serial_timeout || '-'}ms | 自动白平衡：${cfg.auto_white_balance ? '开' : '关'} | 镜像：${cfg.flip_horizontal ? 'H' : '-'}${cfg.flip_vertical ? 'V' : '-'}`;
 
@@ -106,7 +119,6 @@ async function refreshSystem() {
   await ensureCameraPreview(data);
   ensureDetectionPolling(data.camera_on && data.detection_on);
 }
-
 
 async function pollDetection() {
   const data = await fetch('/api/detection/frame-data').then((r) => r.json());
@@ -124,10 +136,6 @@ async function pollDetection() {
   cameraMeta.textContent = `类型：${cards.camera_type || '-'} | 分辨率：${cards.resolution || '-'} | 帧率：${cards.fps || '-'}fps`;
   perfMeta.textContent = `推理耗时：${Number(cards.inference_ms || 0).toFixed(2)}ms`;
   document.getElementById('onlineUsers').textContent = cards.active_users;
-
-  const cfg = cards.openmv_settings || {};
-  document.getElementById('cfgMeta1').textContent = `波特率：${cfg.baudrate || '-'} | 曝光：${cfg.exposure || '-'} | 增益：${cfg.gain || '-'}`;
-  document.getElementById('cfgMeta2').textContent = `超时：${cfg.serial_timeout || '-'}ms | 自动白平衡：${cfg.auto_white_balance ? '开' : '关'} | 镜像：${cfg.flip_horizontal ? 'H' : '-'}${cfg.flip_vertical ? 'V' : '-'}`;
 }
 
 async function pollOpenmvFrames() {
@@ -140,8 +148,6 @@ async function pollOpenmvFrames() {
   const target = document.getElementById('openmvTarget').value.trim() || '-';
   openmvConnStatus.textContent = `连接状态：已连接 | 视频端口：${target} | RX=${data.len}`;
 }
-
-
 
 async function ensureCameraPreview(data) {
   if (!data.camera_on) {
@@ -201,6 +207,23 @@ cameraType.onchange = () => {
   openmvPanel.classList.toggle('d-none', cameraType.value !== 'openmv');
 };
 
+document.getElementById('applyCameraCfgBtn').onclick = async () => {
+  const payload = {
+    resolution: document.getElementById('cfgResolution').value,
+    fps: Number(document.getElementById('cfgFps').value || 15),
+    exposure: Number(document.getElementById('cfgExposure').value || 50),
+    gain: Number(document.getElementById('cfgGain').value || 1),
+    baudrate: Number(document.getElementById('cfgBaudrate').value || 115200),
+    serial_timeout: Number(document.getElementById('cfgTimeout').value || 800),
+    auto_white_balance: document.getElementById('cfgAwb').checked,
+    flip_horizontal: document.getElementById('cfgFlipH').checked,
+    flip_vertical: document.getElementById('cfgFlipV').checked,
+  };
+  const resp = await postApi('/api/openmv/settings', payload);
+  showToast(resp.ok ? '摄像头参数已应用' : '参数应用失败', resp.ok ? 'success' : 'danger');
+  await refreshSystem();
+};
+
 document.getElementById('scanPortBtn').onclick = async () => {
   const data = await fetch('/api/openmv/ports').then((r) => r.json());
   if (!data.ok || !data.ports.length) {
@@ -235,43 +258,17 @@ document.getElementById('disconnectOpenmvBtn').onclick = async () => {
 };
 
 document.getElementById('openCameraBtn').onclick = async () => {
-  try {
-    if (cameraType.value === 'local') {
-      stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      video.srcObject = stream;
-      video.classList.remove('d-none');
-      openmvImage.classList.add('d-none');
-    } else {
-      video.classList.add('d-none');
-      openmvImage.classList.remove('d-none');
-      if (frameTimer) clearInterval(frameTimer);
-      frameTimer = setInterval(pollOpenmvFrames, 500);
-      pollOpenmvFrames();
-    }
-    const resp = await postApi('/api/camera/start', { camera_type: cameraType.value });
-    if (!resp.ok) {
-      showToast(resp.message || '摄像头开启失败', 'warning');
-      return;
-    }
-
-    showToast('摄像头已开启');
-    await refreshSystem();
-  } catch (e) {
-    statusText.textContent = '状态：无法访问摄像头（请检查浏览器权限）';
+  const resp = await postApi('/api/camera/start', { camera_type: cameraType.value });
+  if (!resp.ok) {
+    showToast(resp.message || '摄像头开启失败', 'warning');
+    return;
   }
+  showToast('摄像头已开启');
+  await refreshSystem();
 };
 
 document.getElementById('closeCameraBtn').onclick = async () => {
-  if (stream) {
-    stream.getTracks().forEach((t) => t.stop());
-    stream = null;
-  }
-  if (timer) clearInterval(timer);
-  if (frameTimer) clearInterval(frameTimer);
-  timer = null;
-  frameTimer = null;
   await postApi('/api/camera/stop');
-
   drawBoxes([]);
   renderCounts({});
   statusText.textContent = '状态：待机';
@@ -286,16 +283,13 @@ document.getElementById('startDetBtn').onclick = async () => {
     showToast(`检测开启失败：${data.message}`, 'warning');
     return;
   }
-  if (timer) clearInterval(timer);
-  timer = setInterval(pollDetection, 1200);
+  ensureDetectionPolling(true);
   statusText.textContent = '状态：运行中';
 };
 
 document.getElementById('stopDetBtn').onclick = async () => {
   await postApi('/api/detection/stop');
-  if (timer) clearInterval(timer);
-  timer = null;
-  drawBoxes([]);
+  ensureDetectionPolling(false);
   statusText.textContent = '状态：待机';
 };
 

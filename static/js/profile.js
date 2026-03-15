@@ -12,6 +12,8 @@ async function loadMe() {
   document.getElementById('pfPhone').value = u.phone || '';
   document.getElementById('pfAvatar').value = u.avatar_url || '';
   document.getElementById('pfCreated').value = u.created_at || '';
+  document.getElementById('pfRole').value = u.is_admin ? '管理员' : '普通用户';
+  document.getElementById('pfId').value = u.id || '-';
 }
 
 document.getElementById('saveProfileBtn').onclick = async () => {
@@ -53,8 +55,12 @@ document.getElementById('changePwdBtn').onclick = async () => {
   showToast(res.ok ? '密码修改成功' : (data.message || '密码修改失败'), res.ok ? 'success' : 'danger');
 };
 
-document.getElementById('reloginBtn').onclick = () => {
+document.getElementById('reloginBtn').onclick = async () => {
   window.location.href = '/relogin';
+};
+
+document.getElementById('logoutBtn').onclick = async () => {
+  window.location.href = '/logout';
 };
 
 loadMe();
