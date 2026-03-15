@@ -14,6 +14,7 @@ body {
   padding: 10px 12px;
   margin-bottom: 4px;
   border-radius: 10px;
+  transition: all .25s ease;
 }
 .sidebar .nav-link:hover,
 .sidebar .nav-link.active {
@@ -43,6 +44,42 @@ body {
   border: none;
   border-radius: 12px;
 }
+
+.btn {
+  border-radius: 6px !important;
+  padding: 10px 20px !important;
+  transition: transform .2s ease, box-shadow .2s ease, filter .2s ease;
+}
+.btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, .16);
+  filter: brightness(.92);
+}
+.btn:active {
+  transform: scale(.98);
+}
+.btn:disabled {
+  opacity: .55;
+  filter: grayscale(.25);
+}
+
+.page-transition,
+.panel-anim {
+  animation: fadeSlideIn .35s ease;
+}
+
+.openmv-panel {
+  background: #f8faff;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @media (max-width: 768px) {
   #layoutWrapper { flex-direction: column; }
   .sidebar {

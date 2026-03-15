@@ -10,17 +10,17 @@
 <body>
 <div class="d-flex" id="layoutWrapper">
   {% if current_user.is_authenticated %}
-  <aside class="sidebar p-3">
+  <aside class="sidebar p-3 page-transition">
     <h4 class="mb-4">YOLOv8 GUI</h4>
     <a href="{{ url_for('monitor') }}" class="nav-link {% if request.path.startswith('/monitor') %}active{% endif %}">实时监控</a>
     <a href="{{ url_for('stats_page') }}" class="nav-link {% if request.path.startswith('/stats') %}active{% endif %}">数据统计</a>
     <a href="{{ url_for('history_page') }}" class="nav-link {% if request.path.startswith('/history') %}active{% endif %}">历史记录</a>
-    <a href="{{ url_for('admin_page') }}" class="nav-link {% if request.path.startswith('/admin') %}active{% endif %}">管理员</a>
+    <a href="{{ url_for('admin_page') }}" class="nav-link {% if request.path.startswith('/admin') %}active{% endif %}">系统设置</a>
     <a href="{{ url_for('logout') }}" class="nav-link text-danger">退出登录</a>
   </aside>
   {% endif %}
 
-  <main class="flex-grow-1 p-3 p-md-4 main-content">
+  <main class="flex-grow-1 p-3 p-md-4 main-content page-transition">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for category, message in messages %}
       <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
@@ -32,8 +32,36 @@
     {% block content %}{% endblock %}
   </main>
 </div>
+<div id="toastContainer" class="toast-container position-fixed top-0 end-0 p-3"></div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script>
+function showToast(message, type='success') {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+  const node = document.createElement('div');
+  node.className = `toast align-items-center text-bg-${type} border-0`;
+  node.id = id;
+  node.innerHTML = `<div class="d-flex"><div class="toast-body">${message}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
+  container.appendChild(node);
+  const toast = new bootstrap.Toast(node, {delay: 3000});
+  toast.show();
+  node.addEventListener('hidden.bs.toast', () => node.remove());
+}
+
+function animateNumber(el, target, duration=700) {
+  const start = Number(el.textContent) || 0;
+  const diff = target - start;
+  const t0 = performance.now();
+  const step = (t) => {
+    const p = Math.min((t - t0) / duration, 1);
+    el.textContent = Math.round(start + diff * p);
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

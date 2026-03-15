@@ -8,10 +8,25 @@
   <div class="col-md-3"><div class="card p-3"><div>在线用户数</div><h4 id="cardUsers">0</h4></div></div>
   <div class="col-md-3"><div class="card p-3"><div>摄像头状态</div><h4 id="cardCamera">关闭</h4></div></div>
 </div>
+<div class="card p-3 mb-3 panel-anim">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-2"><label class="form-label">时间范围</label><select class="form-select" id="rangeType"><option value="today">今日</option><option value="yesterday">昨日</option><option value="7d">近7天</option><option value="30d">近30天</option><option value="custom">自定义</option></select></div>
+    <div class="col-md-3"><label class="form-label">开始时间</label><input type="datetime-local" step="1" class="form-control" id="startTime"></div>
+    <div class="col-md-3"><label class="form-label">结束时间</label><input type="datetime-local" step="1" class="form-control" id="endTime"></div>
+    <div class="col-md-4"><label class="form-label">类别筛选（多选）</label><select class="form-select" multiple id="categoryFilter" size="2"></select></div>
+  </div>
+  <div class="mt-2 d-flex gap-2 flex-wrap">
+    <button class="btn btn-primary" id="refreshBtn">刷新数据</button>
+    <button class="btn btn-outline-secondary" id="exportCsvBtn">导出 CSV</button>
+    <button class="btn btn-outline-secondary" id="exportExcelBtn">导出 Excel</button>
+    <button class="btn btn-outline-secondary" id="exportJsonBtn">导出 JSON</button>
+    <button class="btn btn-danger" id="clearDataBtn">清空数据</button>
+  </div>
+</div>
 <div class="row g-3">
-  <div class="col-lg-6"><div class="card p-3"><h6>实时数量折线图</h6><canvas id="lineChart"></canvas></div></div>
-  <div class="col-lg-6"><div class="card p-3"><h6>类别占比饼图</h6><canvas id="pieChart"></canvas></div></div>
-  <div class="col-12"><div class="card p-3"><h6>时段统计柱状图</h6><canvas id="barChart"></canvas></div></div>
+  <div class="col-lg-6"><div class="card p-3"><h6>实时数量折线图</h6><div id="lineChart" style="height:340px;"></div></div></div>
+  <div class="col-lg-6"><div class="card p-3"><h6>类别占比环形/玫瑰图</h6><div id="pieChart" style="height:340px;"></div></div></div>
+  <div class="col-12"><div class="card p-3"><h6>类别柱状图</h6><div id="barChart" style="height:360px;"></div></div></div>
 </div>
 {% endblock %}
 {% block scripts %}
