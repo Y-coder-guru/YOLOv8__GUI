@@ -1,15 +1,11 @@
 const userList = document.getElementById('userList');
 const logList = document.getElementById('logList');
 let logOffset = 0;
-let loading = false;
+const logPageSize = 20;
 
-async function refreshAdmin(resetLogs = true) {
+async function refreshAdmin() {
   const operator = document.getElementById('logOperator').value.trim();
-  if (resetLogs) {
-    logOffset = 0;
-    logList.innerHTML = '';
-  }
-  const res = await fetch(`/api/admin/overview?offset=${logOffset}&limit=50&operator=${encodeURIComponent(operator)}`);
+  const res = await fetch(`/api/admin/overview?offset=${logOffset}&limit=${logPageSize}&operator=${encodeURIComponent(operator)}`);
   const data = await res.json();
   if (!data.ok) return;
 
@@ -27,7 +23,7 @@ async function refreshAdmin(resetLogs = true) {
       <div class='small text-muted'>邮箱: ${u.email || '-'} | 电话: ${u.phone || '-'} | 注册: ${u.created_at}</div>
       <div class='mt-1 d-flex gap-1 flex-wrap'>
         <button class='btn btn-sm btn-outline-secondary'>查看</button>
-        <button class='btn btn-sm btn-outline-warning'>重置密码</button>
+        <button class='btn btn-sm btn-outline-warning'>修改密码</button>
         <button class='btn btn-sm btn-outline-info'>编辑</button>
         <button class='btn btn-sm btn-outline-danger'>删除</button>
       </div>`;
@@ -54,25 +50,28 @@ async function refreshAdmin(resetLogs = true) {
         body: JSON.stringify({ username, email, phone, is_admin: isAdmin, is_active: isActive, avatar_url: u.avatar_url || '' }),
       });
       showToast(r.ok ? '用户更新成功' : '用户更新失败', r.ok ? 'success' : 'danger');
-      refreshAdmin(true);
+      refreshAdmin();
     };
     delBtn.onclick = async () => {
       if (!confirm(`确认删除用户 ${u.username}？`)) return;
       const r = await fetch(`/api/admin/users/${u.id}`, { method: 'DELETE' });
       const d = await r.json();
       showToast(r.ok ? '用户已删除' : (d.message || '删除失败'), r.ok ? 'warning' : 'danger');
-      refreshAdmin(true);
+      refreshAdmin();
     };
     userList.appendChild(li);
   });
 
+  logList.innerHTML = '';
   data.logs.forEach((l) => {
     const li = document.createElement('li');
     li.className = 'list-group-item';
     li.textContent = `[${l.time}] ${l.operator} ${l.ip} ${l.content} (${l.result})`;
     logList.appendChild(li);
   });
-  logOffset += data.logs.length;
+
+  document.getElementById('prevLogPage').disabled = logOffset <= 0;
+  document.getElementById('nextLogPage').disabled = data.logs.length < logPageSize;
 }
 
 document.getElementById('openCreateUser').onclick = async () => {
@@ -90,7 +89,7 @@ document.getElementById('openCreateUser').onclick = async () => {
   });
   const data = await res.json();
   showToast(res.ok ? '用户创建成功' : (data.message || '创建失败'), res.ok ? 'success' : 'danger');
-  refreshAdmin(true);
+  refreshAdmin();
 };
 
 document.getElementById('saveOpenmvCfg').onclick = async () => {
@@ -113,15 +112,18 @@ document.getElementById('saveOpenmvCfg').onclick = async () => {
   if (res.ok) showToast('摄像头配置已保存并实时生效');
 };
 
-document.getElementById('logOperator').oninput = () => refreshAdmin(true);
-logList.addEventListener('scroll', async () => {
-  if (loading) return;
-  if (logList.scrollTop + logList.clientHeight >= logList.scrollHeight - 6) {
-    loading = true;
-    await refreshAdmin(false);
-    loading = false;
-  }
-});
+document.getElementById('logOperator').oninput = () => {
+  logOffset = 0;
+  refreshAdmin();
+};
+document.getElementById('prevLogPage').onclick = () => {
+  logOffset = Math.max(0, logOffset - logPageSize);
+  refreshAdmin();
+};
+document.getElementById('nextLogPage').onclick = () => {
+  logOffset += logPageSize;
+  refreshAdmin();
+};
 
-refreshAdmin(true);
-setInterval(() => refreshAdmin(true), 5000);
+refreshAdmin();
+setInterval(() => refreshAdmin(), 5000);

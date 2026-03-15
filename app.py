@@ -220,6 +220,10 @@ def bjt_now() -> datetime:
     return datetime.utcnow() + timedelta(hours=8)
 
 
+def to_bjt(dt: datetime) -> datetime:
+    return dt + timedelta(hours=8)
+
+
 def hash_password(password: str) -> str:
     return generate_password_hash(password)
 
@@ -267,10 +271,12 @@ def add_duration_seconds(start_dt: datetime, end_dt: datetime):
         return
     cursor = start_dt
     while cursor < end_dt:
-        next_day = datetime(cursor.year, cursor.month, cursor.day) + timedelta(days=1)
-        seg_end = min(end_dt, next_day)
+        cursor_bjt = to_bjt(cursor)
+        next_day_bjt = datetime(cursor_bjt.year, cursor_bjt.month, cursor_bjt.day) + timedelta(days=1)
+        next_day_utc = next_day_bjt - timedelta(hours=8)
+        seg_end = min(end_dt, next_day_utc)
         seg_seconds = int((seg_end - cursor).total_seconds())
-        day_key = cursor.strftime("%Y-%m-%d")
+        day_key = cursor_bjt.strftime("%Y-%m-%d")
         rec = db.session.get(DailyDetectionDuration, day_key)
         if not rec:
             rec = DailyDetectionDuration(day=day_key, seconds=0)
@@ -281,17 +287,20 @@ def add_duration_seconds(start_dt: datetime, end_dt: datetime):
 
 
 def get_today_detection_seconds() -> int:
-    day_key = datetime.utcnow().strftime("%Y-%m-%d")
+    now = datetime.utcnow()
+    now_bjt = to_bjt(now)
+    day_key = now_bjt.strftime("%Y-%m-%d")
     rec = db.session.get(DailyDetectionDuration, day_key)
     total = rec.seconds if rec else 0
     if runtime_state["camera_on"] and runtime_state["camera_started_at"]:
         start_ts = runtime_state["camera_started_at"]
         start_dt = datetime.utcfromtimestamp(start_ts)
-        now = datetime.utcnow()
-        if start_dt.strftime("%Y-%m-%d") == day_key:
+        start_bjt = to_bjt(start_dt)
+        if start_bjt.strftime("%Y-%m-%d") == day_key:
             total += int((now - start_dt).total_seconds())
         elif start_dt < now:
-            day_start = datetime(now.year, now.month, now.day)
+            day_start_bjt = datetime(now_bjt.year, now_bjt.month, now_bjt.day)
+            day_start = day_start_bjt - timedelta(hours=8)
             total += int((now - day_start).total_seconds())
     return max(total, 0)
 
@@ -453,6 +462,21 @@ def logout():
     return redirect(url_for("login"))
 
 
+@app.route("/relogin")
+def relogin():
+    if current_user.is_authenticated:
+        if runtime_state["camera_started_at"]:
+            add_duration_seconds(datetime.utcfromtimestamp(runtime_state["camera_started_at"]), datetime.utcnow())
+        runtime_state["camera_on"] = False
+        runtime_state["detection_on"] = False
+        runtime_state["camera_state"] = "未连接"
+        runtime_state["openmv_connected"] = False
+        runtime_state["camera_started_at"] = None
+        add_log("auth", f"用户重新登录: {current_user.username}", current_user.id)
+        logout_user()
+    return redirect(url_for("login"))
+
+
 @app.route("/profile")
 @login_required
 def profile_page():
@@ -475,12 +499,6 @@ def stats_page():
 @login_required
 def history_page():
     return render_template("history.html")
-
-
-@app.route("/raw-data")
-@login_required
-def raw_data_page():
-    return render_template("raw_data.html")
 
 
 @app.route("/admin")

@@ -1,5 +1,10 @@
 async function loadMe() {
-  const data = await fetch('/api/account/me').then((r) => r.json());
+  const res = await fetch('/api/account/me');
+  if (res.status === 401) {
+    window.location.href = '/login';
+    return;
+  }
+  const data = await res.json();
   if (!data.ok) return;
   const u = data.user;
   document.getElementById('pfUsername').value = u.username || '';
@@ -49,7 +54,7 @@ document.getElementById('changePwdBtn').onclick = async () => {
 };
 
 document.getElementById('reloginBtn').onclick = () => {
-  window.location.href = '/logout';
+  window.location.href = '/relogin';
 };
 
 loadMe();
