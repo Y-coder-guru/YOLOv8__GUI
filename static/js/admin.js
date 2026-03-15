@@ -7,7 +7,7 @@ async function refreshAdmin() {
   const operator = document.getElementById('logOperator').value.trim();
   const res = await fetch(`/api/admin/overview?offset=${logOffset}&limit=${logPageSize}&operator=${encodeURIComponent(operator)}`);
   const data = await res.json();
-  if (!data.ok) return;
+  if (!data.ok) { showToast(data.message || "系统设置数据加载失败", "danger"); return; }
 
   animateNumber(document.getElementById('mUser'), data.metrics.user_count);
   animateNumber(document.getElementById('mHistory'), data.metrics.history_total);
@@ -15,8 +15,10 @@ async function refreshAdmin() {
   document.getElementById('mCamera').textContent = data.metrics.camera_on ? '在线' : '离线';
   animateNumber(document.getElementById('mLogs'), data.metrics.today_logs);
 
-  userList.innerHTML = '';
-  data.users.forEach((u) => {
+  userList.innerHTML = "";
+  const userEmpty = document.getElementById("userEmpty");
+  if (userEmpty) userEmpty.classList.toggle("d-none", (data.users || []).length > 0);
+  (data.users || []).forEach((u) => {
     const li = document.createElement('li');
     li.className = 'list-group-item';
     li.innerHTML = `<div><b>${u.username}</b> (${u.is_admin ? '管理员' : '普通用户'}) / ${u.status}</div>
@@ -88,8 +90,8 @@ document.getElementById('openCreateUser').onclick = async () => {
     body: JSON.stringify({ username, password, email, phone, is_admin }),
   });
   const data = await res.json();
-  showToast(res.ok ? '用户创建成功' : (data.message || '创建失败'), res.ok ? 'success' : 'danger');
-  refreshAdmin();
+  showToast(res.ok ? "用户创建成功" : (data.message || "创建失败"), res.ok ? "success" : "danger");
+  if (res.ok) refreshAdmin();
 };
 
 document.getElementById('saveOpenmvCfg').onclick = async () => {

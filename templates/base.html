@@ -11,14 +11,20 @@
 <div class="d-flex" id="layoutWrapper">
   {% if current_user.is_authenticated %}
   <aside class="sidebar p-3 page-transition">
-    <h4 class="mb-4">YOLOv8 GUI</h4>
+    <h4 class="mb-4 sidebar-brand">YOLOv8 GUI</h4>
     <a href="{{ url_for('monitor') }}" class="nav-link {% if request.path.startswith('/monitor') %}active{% endif %}">实时监控</a>
     <a href="{{ url_for('stats_page') }}" class="nav-link {% if request.path.startswith('/stats') %}active{% endif %}">数据统计</a>
-    <a href="{{ url_for('history_page') }}" class="nav-link {% if request.path.startswith('/history') %}active{% endif %}">历史记录</a>
+    <a href="{{ url_for('history_page') }}" class="nav-link {% if request.path.startswith('/history') %}active{% endif %}">检测记录</a>
     {% if current_user.is_admin %}
     <a href="{{ url_for('admin_page') }}" class="nav-link {% if request.path.startswith('/admin') %}active{% endif %}">系统设置</a>
     {% endif %}
     <a href="{{ url_for('profile_page') }}" class="nav-link {% if request.path.startswith('/profile') %}active{% endif %}">个人账户</a>
+
+    <div class="sidebar-footer mt-auto pt-3">
+      <div>版本：v1.2.0</div>
+      <div>状态：<span id="sidebarSystemState">运行中</span></div>
+      <div>© 2026 YOLOv8 GUI</div>
+    </div>
   </aside>
   {% endif %}
 
@@ -32,7 +38,8 @@
     {% if current_user.is_authenticated %}
     <div class="topbar-meta mb-3">
       <div class="d-flex align-items-center gap-2">
-        <img id="globalAvatar" class="topbar-avatar d-none" alt="用户头像">
+        <img id="globalAvatar" class="topbar-avatar" alt="用户头像">
+        <span id="globalUserName" class="small fw-semibold text-secondary">当前用户</span>
         <span class="badge text-bg-dark" id="globalCameraStatus">摄像头：未连接</span>
         <span class="badge text-bg-light" id="bjClock">--</span>
       </div>
@@ -87,6 +94,8 @@ async function refreshGlobalStatus() {
     const data = await res.json();
     if (!data.ok) return;
     const text = data.camera_state || '未连接';
+    const sb = document.getElementById('sidebarSystemState');
+    if (sb) sb.textContent = data.camera_on ? `${text} · 监控中` : '待机';
     el.textContent = `摄像头：${text}`;
     el.className = `badge ${text === '已连接' ? 'text-bg-success' : text === '连接中' ? 'text-bg-warning' : 'text-bg-dark'}`;
   } catch (e) {
@@ -96,23 +105,28 @@ async function refreshGlobalStatus() {
 
 
 
+
+function buildAvatarDataUri(name='U') {
+  const txt = (name || 'U').slice(0, 2).toUpperCase();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="100%" height="100%" fill="#4f46e5"/><text x="50%" y="54%" text-anchor="middle" font-size="24" fill="#fff" font-family="Arial">${txt}</text></svg>`;
+  return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+}
+
 async function refreshGlobalAvatar() {
   const el = document.getElementById('globalAvatar');
+  const nameEl = document.getElementById('globalUserName');
   if (!el) return;
   try {
     const res = await fetch('/api/account/me');
     if (!res.ok) return;
     const data = await res.json();
     if (!data.ok) return;
-    const avatar = data.user?.avatar_url || '';
-    if (avatar) {
-      el.src = avatar;
-      el.classList.remove('d-none');
-    } else {
-      el.classList.add('d-none');
-    }
+    const username = data.user?.username || '用户';
+    const avatar = data.user?.avatar_url || buildAvatarDataUri(username);
+    el.src = avatar;
+    if (nameEl) nameEl.textContent = username;
   } catch (e) {
-    el.classList.add('d-none');
+    el.src = buildAvatarDataUri('U');
   }
 }
 

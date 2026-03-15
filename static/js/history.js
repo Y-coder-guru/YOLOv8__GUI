@@ -17,6 +17,11 @@ function getFilters() {
   };
 }
 
+function getExportUrl(format) {
+  const f = getFilters();
+  return `/api/stats/export?format=${format}&start_time=${encodeURIComponent(f.start_time)}&end_time=${encodeURIComponent(f.end_time)}`;
+}
+
 async function showDetail(id) {
   const modal = new bootstrap.Modal(document.getElementById('detailModal'));
   const body = document.getElementById('detailBody');
@@ -28,7 +33,7 @@ async function showDetail(id) {
     return;
   }
   const r = data.record;
-  body.innerHTML = `<div class="row"><div class="col-md-6"><div class="fake-shot">检测画面占位</div></div><div class="col-md-6"><p><b>时间:</b> ${r.time}</p><p><b>类别:</b> ${r.category}</p><p><b>数量:</b> ${r.count}</p><p><b>操作人:</b> ${r.operator}</p><p><b>操作类型:</b> ${r.operation_type}</p><p><b>置信度:</b> ${r.confidence}</p></div></div>`;
+  body.innerHTML = `<div class="row"><div class="col-md-6"><div class="placeholder-panel" style="min-height:160px;">检测画面占位</div></div><div class="col-md-6"><p><b>时间:</b> ${r.time}</p><p><b>类别:</b> ${r.category}</p><p><b>数量:</b> ${r.count}</p><p><b>操作人:</b> ${r.operator}</p><p><b>操作类型:</b> ${r.operation_type}</p><p><b>置信度:</b> ${r.confidence}</p></div></div>`;
 }
 
 async function removeRecord(id) {
@@ -49,7 +54,7 @@ async function loadHistory() {
   page = data.page;
   tbody.innerHTML = '';
   if (!data.records.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">暂无历史记录，请先进行检测。</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">暂无检测记录，请先进行检测。</td></tr>';
   }
 
   data.records.forEach((r) => {
@@ -76,6 +81,6 @@ document.getElementById('nextPage').onclick = () => { const totalPage = Math.max
 
 loadHistory();
 
-document.getElementById('exportCsvBtn').onclick = () => window.open('/api/stats/export?format=csv');
-document.getElementById('exportExcelBtn').onclick = () => window.open('/api/stats/export?format=excel');
-document.getElementById('exportJsonBtn').onclick = () => window.open('/api/stats/export?format=json');
+document.getElementById('exportCsvBtn').onclick = () => window.open(getExportUrl('csv'));
+document.getElementById('exportExcelBtn').onclick = () => window.open(getExportUrl('excel'));
+document.getElementById('exportJsonBtn').onclick = () => window.open(getExportUrl('json'));
