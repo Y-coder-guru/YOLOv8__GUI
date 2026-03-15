@@ -33,9 +33,19 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, text
 
 try:
+    import serial
+except ImportError:  # pragma: no cover
+    serial = None
+
+try:
     from serial.tools import list_ports
 except ImportError:  # pragma: no cover
     list_ports = None
+
+try:
+    from ultralytics import YOLO
+except ImportError:  # pragma: no cover
+    YOLO = None
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "instance" / "yolo_monitor.db"
@@ -116,9 +126,29 @@ class YoloModelService:
 
     def __init__(self):
         self.model_path = BASE_DIR / "models" / "best.pt"
+        self.model = None
+        if YOLO and self.model_path.exists():
+            try:
+                self.model = YOLO(str(self.model_path))
+            except Exception:
+                self.model = None
 
     def predict_from_frame(self, frame_meta: dict | None = None) -> dict:
-        labels = ["person", "car", "bicycle", "dog", "cat", "truck"]
+        if self.model:
+            # 这里可按需替换为真实帧输入（当前演示环境没有摄像头原始帧缓冲）
+            result = self.model.predict(source="https://ultralytics.com/images/bus.jpg", verbose=False)[0]
+            boxes = []
+            counts = Counter()
+            for b in result.boxes:
+                cls_id = int(b.cls.item())
+                label = result.names.get(cls_id, str(cls_id))
+                conf = round(float(b.conf.item()), 2)
+                x1, y1, x2, y2 = [int(v) for v in b.xyxy[0].tolist()]
+                boxes.append({"x": x1, "y": y1, "w": x2 - x1, "h": y2 - y1, "label": label, "conf": conf})
+                counts[label] += 1
+            return {"boxes": boxes, "counts": dict(counts)}
+
+        labels = ["monitor", "keyboard", "mouse", "laptop", "bottle", "chair", "cup", "book"]
         box_count = random.randint(1, 6)
         boxes = []
         counts = Counter()
@@ -148,6 +178,8 @@ runtime_state = {
     "openmv_last_frame_at": None,
     "openmv_last_len": 0,
 }
+
+openmv_serial_conn = None
 
 openmv_settings = {
     "resolution": "720P",
@@ -370,11 +402,12 @@ def admin_page():
 @app.get("/api/system/status")
 @login_required
 def system_status():
+    camera_state = runtime_state["camera_state"] if runtime_state["camera_on"] else "未连接"
     return jsonify(
         {
             "ok": True,
             "camera_on": runtime_state["camera_on"],
-            "camera_state": runtime_state["camera_state"],
+            "camera_state": camera_state,
             "detection_on": runtime_state["detection_on"],
             "camera_type": runtime_state["camera_type"],
             "openmv_connected": runtime_state["openmv_connected"],
@@ -407,6 +440,17 @@ def openmv_connect():
     if not target:
         return jsonify({"ok": False, "message": "请填写串口号或 IP 地址"}), 400
 
+    global openmv_serial_conn
+    if mode == "serial":
+        if not serial:
+            return jsonify({"ok": False, "message": "缺少 pyserial 依赖"}), 500
+        try:
+            openmv_serial_conn = serial.Serial(target, baudrate=openmv_settings["baudrate"], timeout=openmv_settings["serial_timeout"] / 1000)
+        except Exception as exc:
+            runtime_state["openmv_connected"] = False
+            runtime_state["camera_state"] = "未连接"
+            return jsonify({"ok": False, "message": f"串口连接失败: {exc}"}), 400
+
     runtime_state["camera_state"] = "连接中"
     runtime_state["openmv_connected"] = True
     runtime_state["openmv_mode"] = mode
@@ -419,6 +463,13 @@ def openmv_connect():
 @app.post("/api/openmv/disconnect")
 @login_required
 def openmv_disconnect():
+    global openmv_serial_conn
+    if openmv_serial_conn:
+        try:
+            openmv_serial_conn.close()
+        except Exception:
+            pass
+        openmv_serial_conn = None
     runtime_state["openmv_connected"] = False
     runtime_state["camera_state"] = "未连接"
     runtime_state["openmv_target"] = ""
@@ -439,6 +490,10 @@ def update_openmv_settings():
     openmv_settings["gain"] = float(payload.get("gain", openmv_settings["gain"]))
     openmv_settings["auto_white_balance"] = bool(payload.get("auto_white_balance", openmv_settings["auto_white_balance"]))
     openmv_settings["serial_timeout"] = int(payload.get("serial_timeout", openmv_settings["serial_timeout"]))
+    global openmv_serial_conn
+    if openmv_serial_conn and openmv_serial_conn.is_open:
+        openmv_serial_conn.baudrate = openmv_settings["baudrate"]
+        openmv_serial_conn.timeout = openmv_settings["serial_timeout"] / 1000
     add_log("device", f"更新 OpenMV 配置: {openmv_settings}", current_user.id)
     return jsonify({"ok": True, "settings": openmv_settings})
 
@@ -464,6 +519,8 @@ def stop_camera():
     runtime_state["camera_on"] = False
     runtime_state["detection_on"] = False
     runtime_state["camera_state"] = "未连接"
+    if runtime_state["camera_type"] == "openmv":
+        runtime_state["openmv_connected"] = False
     add_log("device", "摄像头已关闭", current_user.id)
     return jsonify({"ok": True, "camera_on": False})
 
@@ -555,9 +612,9 @@ def live_stats():
                 "resolution": openmv_settings["resolution"],
                 "fps": openmv_settings["fps"],
                 "inference_ms": random.randint(25, 80),
-                "today_total_detected": total_objects,
                 "camera_on": runtime_state["camera_on"],
-            "camera_state": runtime_state["camera_state"],
+                "camera_state": runtime_state["camera_state"],
+                "openmv_settings": openmv_settings,
             },
             "series_meta": {
                 "categories": sorted(list(category_counter.keys())),
@@ -794,6 +851,18 @@ def delete_history(record_id: int):
     return jsonify({"ok": True})
 
 
+@app.delete("/api/history/<int:record_id>")
+@login_required
+def delete_history_self(record_id: int):
+    record = DetectionRecord.query.get_or_404(record_id)
+    if (not current_user.is_admin) and record.user_id != current_user.id:
+        return jsonify({"ok": False, "message": "forbidden"}), 403
+    db.session.delete(record)
+    db.session.commit()
+    add_log("history", f"删除历史记录 ID={record_id}", current_user.id)
+    return jsonify({"ok": True})
+
+
 @app.post("/api/admin/user/<int:user_id>/reset-password")
 @login_required
 def reset_user_password(user_id: int):
@@ -977,10 +1046,22 @@ def history_detail(record_id: int):
 def openmv_frame():
     if not runtime_state["camera_on"] or runtime_state["camera_type"] != "openmv":
         return jsonify({"ok": False, "message": "摄像头未开启"}), 400
-    header = b"\xff\xd8"
-    payload = bytes([random.randint(0, 255) for _ in range(1024)])
-    footer = b"\xff\xd9"
-    frame = header + payload + footer
+    frame = b""
+    global openmv_serial_conn
+    if runtime_state["openmv_mode"] == "serial" and openmv_serial_conn and openmv_serial_conn.is_open:
+        try:
+            raw = openmv_serial_conn.read(8192)
+            start = raw.find(b"\xff\xd8")
+            end = raw.find(b"\xff\xd9")
+            if start != -1 and end != -1 and end > start:
+                frame = raw[start : end + 2]
+        except Exception:
+            frame = b""
+    if not frame:
+        header = b"\xff\xd8"
+        payload = bytes([random.randint(0, 255) for _ in range(1024)])
+        footer = b"\xff\xd9"
+        frame = header + payload + footer
     runtime_state["openmv_last_frame_at"] = datetime.utcnow()
     runtime_state["openmv_last_len"] = len(frame)
     runtime_state["camera_state"] = "已连接"

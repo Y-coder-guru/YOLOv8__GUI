@@ -16,7 +16,7 @@ async function refreshAdmin(resetLogs = true) {
   animateNumber(document.getElementById('mUser'), data.metrics.user_count);
   animateNumber(document.getElementById('mHistory'), data.metrics.history_total);
   document.getElementById('mHistoryDesc').textContent = data.metrics.history_total_desc;
-  document.getElementById('mCamera').textContent = data.metrics.camera_on ? '开启' : '关闭';
+  document.getElementById('mCamera').textContent = data.metrics.camera_on ? '在线' : '离线';
   animateNumber(document.getElementById('mLogs'), data.metrics.today_logs);
 
   userList.innerHTML = '';

@@ -77,7 +77,7 @@ async function refreshCards() {
   animateNumber(document.getElementById('cardEvents'), data.cards.today_events);
   animateNumber(document.getElementById('cardObjects'), data.cards.today_objects);
   animateNumber(document.getElementById('cardUsers'), data.cards.active_users);
-  document.getElementById('cardCamera').textContent = data.cards.camera_on ? '开启' : '关闭';
+  document.getElementById('cardCamera').textContent = data.cards.camera_on ? '在线' : '离线';
 }
 
 async function refreshAdvanced() {
@@ -133,6 +133,12 @@ async function init() {
     refreshCards();
     refreshAdvanced();
   }, 5000);
+
+  setTimeout(() => {
+    lineChart.resize();
+    pieChart.resize();
+    barChart.resize();
+  }, 200);
 }
 
 init();
