@@ -30,7 +30,7 @@ from flask_login import (
     logout_user,
 )
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func
+from sqlalchemy import func, text
 
 try:
     from serial.tools import list_ports
@@ -182,6 +182,21 @@ def init_db():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with app.app_context():
         db.create_all()
+        user_columns = {
+            row[1]
+            for row in db.session.execute(text("PRAGMA table_info('user')")).fetchall()
+        }
+        if "is_active_account" not in user_columns:
+            db.session.execute(
+                text(
+                    "ALTER TABLE user ADD COLUMN is_active_account BOOLEAN NOT NULL DEFAULT 1"
+                )
+            )
+            db.session.commit()
+        if "last_login_at" not in user_columns:
+            db.session.execute(text("ALTER TABLE user ADD COLUMN last_login_at DATETIME"))
+            db.session.commit()
+
         admin = User.query.filter_by(username="admin").first()
         if not admin:
             admin = User(
