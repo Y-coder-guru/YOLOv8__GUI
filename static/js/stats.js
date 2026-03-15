@@ -92,7 +92,7 @@ async function refreshCards() {
   animateNumber(document.getElementById('cardEvents'), data.cards.today_events);
   animateNumber(document.getElementById('cardObjects'), data.cards.today_objects);
   animateNumber(document.getElementById('cardUsers'), data.cards.active_users);
-  document.getElementById('cardCamera').textContent = data.cards.camera_on ? '在线' : '离线';
+  document.getElementById('cardCamera').textContent = data.cards.camera_state || '未连接';
 }
 
 async function refreshAdvanced() {
