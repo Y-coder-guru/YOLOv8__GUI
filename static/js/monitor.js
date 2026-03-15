@@ -13,8 +13,7 @@ let stream = null;
 let timer = null;
 let frameTimer = null;
 let durationTimer = null;
-let durationBaseSeconds = 0;
-let durationBaseAt = Date.now();
+
 
 async function postApi(url, payload) {
   const res = await fetch(url, {
@@ -71,19 +70,7 @@ function renderCounts(counts = {}) {
   });
 }
 
-async function ensureLocalStreamWhenServerOn(data) {
-  if (data.camera_type !== 'local') return;
-  if (!data.camera_on) return;
-  if (stream) return;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    video.srcObject = stream;
-    video.classList.remove('d-none');
-    openmvImage.classList.add('d-none');
-  } catch (err) {
-    await postApi('/api/camera/stop');
-    showToast('本地摄像头权限已丢失，已同步关闭状态', 'warning');
-  }
+
 }
 
 async function refreshSystem() {
@@ -96,23 +83,20 @@ async function refreshSystem() {
   const isOnline = data.camera_on && data.camera_state !== '未连接';
   document.getElementById('cameraStateMini').textContent = isOnline ? '在线' : '离线';
 
-  durationBaseSeconds = Number(data.today_detection_seconds || 0);
-  durationBaseAt = Date.now();
-  renderDurationTick();
+
+  }
 
   statusText.textContent = `状态：${data.detection_on ? '运行中' : (data.camera_on ? '摄像头已开启' : '待机')}`;
   cameraMeta.textContent = `类型：${data.camera_type || '-'} | 分辨率：${data.openmv_settings?.resolution || '-'} | 帧率：${data.openmv_settings?.fps || '-'}fps`;
-  perfMeta.textContent = `推理耗时：${Number(data.last_inference_ms || 0).toFixed(2)}ms`;
+  perfMeta.textContent = `推理耗时：${data.last_inference_ms || '-'}ms`;
   const cfg = data.openmv_settings || {};
   document.getElementById('cfgMeta1').textContent = `波特率：${cfg.baudrate || '-'} | 曝光：${cfg.exposure || '-'} | 增益：${cfg.gain || '-'}`;
   document.getElementById('cfgMeta2').textContent = `超时：${cfg.serial_timeout || '-'}ms | 自动白平衡：${cfg.auto_white_balance ? '开' : '关'} | 镜像：${cfg.flip_horizontal ? 'H' : '-'}${cfg.flip_vertical ? 'V' : '-'}`;
 
-  await ensureLocalStreamWhenServerOn(data);
-
-  if (cameraType.value === 'openmv' && data.camera_on && !frameTimer) {
-    frameTimer = setInterval(pollOpenmvFrames, 500);
-    pollOpenmvFrames();
+  if (data.camera_type === 'openmv') {
+    openmvPanel.classList.remove('d-none');
   }
+  syncDuration();
 }
 
 async function pollDetection() {
@@ -204,6 +188,7 @@ document.getElementById('openCameraBtn').onclick = async () => {
       showToast(resp.message || '摄像头开启失败', 'warning');
       return;
     }
+
     showToast('摄像头已开启');
     await refreshSystem();
   } catch (e) {
@@ -221,6 +206,7 @@ document.getElementById('closeCameraBtn').onclick = async () => {
   timer = null;
   frameTimer = null;
   await postApi('/api/camera/stop');
+
   drawBoxes([]);
   renderCounts({});
   statusText.textContent = '状态：待机';
@@ -260,7 +246,7 @@ document.getElementById('fullscreenBtn').onclick = async () => {
   }
 };
 
-durationTimer = setInterval(renderDurationTick, 1000);
+
 setInterval(refreshSystem, 2500);
 refreshSystem();
 renderDurationTick();

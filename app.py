@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import base64
-import json
+
 import time
 import random
 import socket
@@ -503,7 +503,7 @@ def system_status():
             "last_detection_time": runtime_state["last_detection_time"],
             "camera_started_at": runtime_state["camera_started_at"],
             "last_inference_ms": runtime_state["last_inference_ms"],
-            "today_detection_seconds": get_today_detection_seconds(),
+
             "server_time": bjt_now().strftime("%Y-%m-%d %H:%M:%S"),
         }
     )
@@ -600,7 +600,7 @@ def start_camera():
     runtime_state["camera_on"] = True
     runtime_state["camera_state"] = "已连接" if camera_type == "local" else "连接中"
     if runtime_state["camera_started_at"] is None:
-        runtime_state["camera_started_at"] = datetime.utcnow().timestamp()
+
     add_log("device", f"摄像头已开启({camera_type})", current_user.id)
     return jsonify({"ok": True, "camera_on": True, "camera_type": camera_type})
 
