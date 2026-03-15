@@ -8,6 +8,7 @@ from pathlib import Path
 
 from flask import (
     Flask,
+    Response,
     flash,
     jsonify,
     redirect,
@@ -27,6 +28,11 @@ from flask_login import (
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func
 from werkzeug.security import check_password_hash, generate_password_hash
+
+try:
+    from serial.tools import list_ports
+except ImportError:  # pragma: no cover
+    list_ports = None
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "instance" / "yolo_monitor.db"
@@ -120,6 +126,17 @@ runtime_state = {
     "camera_on": False,
     "detection_on": False,
     "last_detection_time": None,
+    "camera_type": "local",
+    "openmv_connected": False,
+    "openmv_mode": "serial",
+    "openmv_target": "",
+}
+
+openmv_settings = {
+    "resolution": "640x480",
+    "fps": 15,
+    "flip_horizontal": False,
+    "flip_vertical": False,
 }
 
 
@@ -151,6 +168,32 @@ def get_lan_ip() -> str:
             return s.getsockname()[0]
     except OSError:
         return "127.0.0.1"
+
+
+def parse_time_range(range_key: str, start_time: str, end_time: str):
+    now = datetime.utcnow()
+    if range_key == "today":
+        start = datetime(now.year, now.month, now.day)
+        end = now
+    elif range_key == "yesterday":
+        start = datetime(now.year, now.month, now.day) - timedelta(days=1)
+        end = datetime(now.year, now.month, now.day) - timedelta(seconds=1)
+    elif range_key == "7d":
+        start = now - timedelta(days=7)
+        end = now
+    elif range_key == "30d":
+        start = now - timedelta(days=30)
+        end = now
+    elif range_key == "custom":
+        try:
+            start = datetime.fromisoformat(start_time)
+            end = datetime.fromisoformat(end_time)
+        except (TypeError, ValueError):
+            return None, None
+    else:
+        start = now - timedelta(days=1)
+        end = now
+    return start, end
 
 
 @app.before_request
@@ -253,18 +296,78 @@ def system_status():
             "ok": True,
             "camera_on": runtime_state["camera_on"],
             "detection_on": runtime_state["detection_on"],
+            "camera_type": runtime_state["camera_type"],
+            "openmv_connected": runtime_state["openmv_connected"],
+            "openmv_mode": runtime_state["openmv_mode"],
+            "openmv_target": runtime_state["openmv_target"],
+            "openmv_settings": openmv_settings,
             "last_detection_time": runtime_state["last_detection_time"],
             "server_time": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
         }
     )
 
 
+@app.get("/api/openmv/ports")
+@login_required
+def openmv_ports():
+    ports = []
+    if list_ports:
+        ports = [p.device for p in list_ports.comports()]
+    if not ports:
+        ports = ["COM3", "COM4", "/dev/ttyUSB0"]
+    return jsonify({"ok": True, "ports": ports})
+
+
+@app.post("/api/openmv/connect")
+@login_required
+def openmv_connect():
+    payload = request.get_json(silent=True) or {}
+    mode = payload.get("mode", "serial")
+    target = (payload.get("target") or "").strip()
+    if not target:
+        return jsonify({"ok": False, "message": "请填写串口号或 IP 地址"}), 400
+
+    runtime_state["openmv_connected"] = True
+    runtime_state["openmv_mode"] = mode
+    runtime_state["openmv_target"] = target
+    runtime_state["camera_type"] = "openmv"
+    add_log("device", f"OpenMV 已连接: {mode} {target}", current_user.id)
+    return jsonify({"ok": True, "status": "connected", "mode": mode, "target": target})
+
+
+@app.post("/api/openmv/disconnect")
+@login_required
+def openmv_disconnect():
+    runtime_state["openmv_connected"] = False
+    runtime_state["openmv_target"] = ""
+    add_log("device", "OpenMV 已断开", current_user.id)
+    return jsonify({"ok": True, "status": "disconnected"})
+
+
+@app.post("/api/openmv/settings")
+@login_required
+def update_openmv_settings():
+    payload = request.get_json(silent=True) or {}
+    openmv_settings["resolution"] = payload.get("resolution", openmv_settings["resolution"])
+    openmv_settings["fps"] = int(payload.get("fps", openmv_settings["fps"]))
+    openmv_settings["flip_horizontal"] = bool(payload.get("flip_horizontal", openmv_settings["flip_horizontal"]))
+    openmv_settings["flip_vertical"] = bool(payload.get("flip_vertical", openmv_settings["flip_vertical"]))
+    add_log("device", f"更新 OpenMV 配置: {openmv_settings}", current_user.id)
+    return jsonify({"ok": True, "settings": openmv_settings})
+
+
 @app.post("/api/camera/start")
 @login_required
 def start_camera():
+    payload = request.get_json(silent=True) or {}
+    camera_type = payload.get("camera_type", "local")
+    if camera_type == "openmv" and not runtime_state["openmv_connected"]:
+        return jsonify({"ok": False, "message": "OpenMV 未连接，请先连接设备"}), 400
+
+    runtime_state["camera_type"] = camera_type
     runtime_state["camera_on"] = True
-    add_log("device", "摄像头已开启", current_user.id)
-    return jsonify({"ok": True, "camera_on": True})
+    add_log("device", f"摄像头已开启({camera_type})", current_user.id)
+    return jsonify({"ok": True, "camera_on": True, "camera_type": camera_type})
 
 
 @app.post("/api/camera/stop")
@@ -304,7 +407,8 @@ def frame_data():
     if not runtime_state["detection_on"]:
         return jsonify({"ok": True, "boxes": [], "counts": {}, "detection_on": False})
 
-    result = model_service.predict_from_frame()
+    frame_meta = {"source": runtime_state["camera_type"], "openmv": openmv_settings}
+    result = model_service.predict_from_frame(frame_meta=frame_meta)
     runtime_state["last_detection_time"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
     for category, count in result["counts"].items():
@@ -358,11 +462,115 @@ def live_stats():
                 "active_users": User.query.count(),
                 "camera_on": runtime_state["camera_on"],
             },
+            "series_meta": {
+                "categories": sorted(list(category_counter.keys())),
+                "total": total_objects,
+            },
             "line": timeline,
             "pie": [{"name": k, "value": v} for k, v in category_counter.items()],
             "bar": hourly,
         }
     )
+
+
+@app.get("/api/stats/advanced")
+@login_required
+def advanced_stats():
+    range_key = request.args.get("range", "today")
+    start_time = request.args.get("start_time", "")
+    end_time = request.args.get("end_time", "")
+    categories = [c.strip() for c in request.args.get("categories", "").split(",") if c.strip()]
+
+    start, end = parse_time_range(range_key, start_time, end_time)
+    if not start or not end:
+        return jsonify({"ok": False, "message": "自定义时间格式错误"}), 400
+
+    records = DetectionRecord.query.filter(
+        DetectionRecord.detect_time >= start,
+        DetectionRecord.detect_time <= end,
+    )
+    if categories:
+        records = records.filter(DetectionRecord.category.in_(categories))
+    records = records.all()
+
+    total = sum(r.count for r in records)
+    cate = Counter()
+    timeline = []
+    grouped = Counter()
+    for r in records:
+        cate[r.category] += r.count
+        key = r.detect_time.strftime("%Y-%m-%d %H:%M")
+        grouped[key] += r.count
+    for key in sorted(grouped.keys())[-100:]:
+        timeline.append({"time": key, "value": grouped[key], "dist": dict(cate)})
+
+    bar_data = []
+    for name, value in cate.items():
+        bar_data.append({"name": name, "value": value})
+
+    return jsonify(
+        {
+            "ok": True,
+            "timeline": timeline,
+            "pie": [{"name": n, "value": v} for n, v in cate.items()],
+            "bar": bar_data,
+            "categories": sorted(list({r.category for r in DetectionRecord.query.all()})),
+            "total": total,
+            "range": {"start": start.isoformat(sep=" "), "end": end.isoformat(sep=" ")},
+        }
+    )
+
+
+@app.get("/api/stats/export")
+@login_required
+def export_stats():
+    fmt = request.args.get("format", "csv").lower()
+    records = DetectionRecord.query.order_by(DetectionRecord.detect_time.desc()).limit(3000).all()
+    rows = [
+        {
+            "id": r.id,
+            "time": r.detect_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "category": r.category,
+            "count": r.count,
+            "confidence": r.confidence,
+        }
+        for r in records
+    ]
+
+    if fmt == "json":
+        return jsonify({"ok": True, "data": rows})
+
+    if fmt == "excel":
+        lines = ["ID\t时间\t类别\t数量\t置信度"]
+        for r in rows:
+            lines.append(f"{r['id']}\t{r['time']}\t{r['category']}\t{r['count']}\t{r['confidence']}")
+        content = "\n".join(lines)
+        mimetype = "application/vnd.ms-excel"
+        suffix = "xls"
+    else:
+        lines = ["id,time,category,count,confidence"]
+        for r in rows:
+            lines.append(f"{r['id']},{r['time']},{r['category']},{r['count']},{r['confidence']}")
+        content = "\n".join(lines)
+        mimetype = "text/csv"
+        suffix = "csv"
+
+    return Response(
+        content,
+        mimetype=mimetype,
+        headers={"Content-Disposition": f"attachment; filename=stats_export.{suffix}"},
+    )
+
+
+@app.delete("/api/admin/history")
+@login_required
+def clear_history():
+    if not current_user.is_admin:
+        return jsonify({"ok": False, "message": "forbidden"}), 403
+    DetectionRecord.query.delete()
+    db.session.commit()
+    add_log("admin", "管理员清空全部检测记录", current_user.id)
+    return jsonify({"ok": True})
 
 
 @app.get("/api/history")

@@ -4,13 +4,25 @@
 <h2 class="mb-3">实时监控中心</h2>
 <div class="row g-3">
   <div class="col-lg-8">
-    <div class="video-panel card p-3">
-      <div class="d-flex gap-2 flex-wrap mb-3">
+    <div class="video-panel card p-3 panel-anim">
+      <div class="d-flex gap-2 flex-wrap mb-3 align-items-center">
+        <select class="form-select w-auto" id="cameraType">
+          <option value="local">本地摄像头</option>
+          <option value="openmv">OpenMV 摄像头</option>
+        </select>
         <button class="btn btn-primary" id="openCameraBtn">打开摄像头</button>
         <button class="btn btn-outline-secondary" id="closeCameraBtn">关闭摄像头</button>
         <button class="btn btn-success" id="startDetBtn">开始目标检测</button>
         <button class="btn btn-outline-danger" id="stopDetBtn">停止目标检测</button>
         <button class="btn btn-dark" id="fullscreenBtn">全屏显示</button>
+      </div>
+      <div class="openmv-panel mb-3 d-none" id="openmvPanel">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-3"><label class="form-label">连接方式</label><select class="form-select" id="openmvMode"><option value="serial">串口</option><option value="network">网络</option></select></div>
+          <div class="col-md-4"><label class="form-label">目标地址</label><input class="form-control" id="openmvTarget" placeholder="串口号或 IP:PORT"></div>
+          <div class="col-md-5 d-flex gap-2"><button class="btn btn-outline-primary" id="scanPortBtn">自动扫描端口</button><button class="btn btn-primary" id="connectOpenmvBtn">连接 OpenMV</button><button class="btn btn-outline-danger" id="disconnectOpenmvBtn">断开</button></div>
+        </div>
+        <div class="small text-muted mt-2" id="openmvConnStatus">连接状态：未连接</div>
       </div>
       <div class="video-wrap" id="videoWrap">
         <video id="video" autoplay playsinline muted></video>
@@ -19,7 +31,7 @@
     </div>
   </div>
   <div class="col-lg-4">
-    <div class="card p-3 h-100">
+    <div class="card p-3 h-100 panel-anim">
       <h5>实时统计</h5>
       <ul class="list-group" id="countList"></ul>
       <div class="mt-3 text-muted small" id="statusText">状态：待机</div>
