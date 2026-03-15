@@ -3,14 +3,16 @@
 {% block content %}
 <h2 class="mb-3">历史检测记录</h2>
 <div class="card p-3 mb-3">
-  <div class="row g-2">
+  <div class="row g-2 align-items-end">
     <div class="col-md-2"><input class="form-control" id="keyword" placeholder="关键词（设备/备注）"></div>
     <div class="col-md-2"><input class="form-control" id="category" placeholder="类别"></div>
     <div class="col-md-2"><input class="form-control" id="status" placeholder="状态(目标检测)"></div>
     <div class="col-md-2"><input class="form-control" id="startTime" type="datetime-local" step="1"></div>
     <div class="col-md-2"><input class="form-control" id="endTime" type="datetime-local" step="1"></div>
-    <div class="col-md-1"><button class="btn btn-primary w-100" id="searchBtn">筛选</button></div>
-    <div class="col-md-1"><button class="btn btn-outline-secondary w-100" id="resetBtn">重置筛选</button></div>
+    <div class="col-md-2 d-flex gap-2 filter-actions">
+      <button class="btn btn-primary uniform-btn" id="searchBtn">筛选</button>
+      <button class="btn btn-outline-secondary uniform-btn" id="resetBtn">重置筛选</button>
+    </div>
   </div>
 </div>
 <div class="card p-3 table-responsive">
@@ -21,8 +23,8 @@
   <div class="d-flex justify-content-between align-items-center mt-2">
     <small class="text-muted" id="pageInfo">共 0 条</small>
     <div class="btn-group">
-      <button class="btn btn-sm btn-outline-primary" id="prevPage">上一页</button>
-      <button class="btn btn-sm btn-outline-primary" id="nextPage">下一页</button>
+      <button class="btn btn-outline-primary uniform-btn" id="prevPage">上一页</button>
+      <button class="btn btn-outline-primary uniform-btn" id="nextPage">下一页</button>
     </div>
   </div>
 </div>

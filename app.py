@@ -64,6 +64,9 @@ class User(UserMixin, db.Model):
     is_admin = db.Column(db.Boolean, default=False)
     is_active_account = db.Column(db.Boolean, default=True)
     last_login_at = db.Column(db.DateTime, nullable=True)
+    email = db.Column(db.String(120), nullable=False, default="")
+    phone = db.Column(db.String(30), nullable=False, default="")
+    avatar_url = db.Column(db.String(255), nullable=False, default="")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -152,6 +155,10 @@ openmv_settings = {
     "baudrate": 115200,
     "flip_horizontal": False,
     "flip_vertical": False,
+    "exposure": 50,
+    "gain": 1.0,
+    "auto_white_balance": True,
+    "serial_timeout": 800,
 }
 
 
@@ -195,6 +202,15 @@ def init_db():
             db.session.commit()
         if "last_login_at" not in user_columns:
             db.session.execute(text("ALTER TABLE user ADD COLUMN last_login_at DATETIME"))
+            db.session.commit()
+        if "email" not in user_columns:
+            db.session.execute(text("ALTER TABLE user ADD COLUMN email VARCHAR(120) NOT NULL DEFAULT ''"))
+            db.session.commit()
+        if "phone" not in user_columns:
+            db.session.execute(text("ALTER TABLE user ADD COLUMN phone VARCHAR(30) NOT NULL DEFAULT ''"))
+            db.session.commit()
+        if "avatar_url" not in user_columns:
+            db.session.execute(text("ALTER TABLE user ADD COLUMN avatar_url VARCHAR(255) NOT NULL DEFAULT ''"))
             db.session.commit()
 
         admin = User.query.filter_by(username="admin").first()
@@ -419,6 +435,10 @@ def update_openmv_settings():
     openmv_settings["baudrate"] = int(payload.get("baudrate", openmv_settings["baudrate"]))
     openmv_settings["flip_horizontal"] = bool(payload.get("flip_horizontal", openmv_settings["flip_horizontal"]))
     openmv_settings["flip_vertical"] = bool(payload.get("flip_vertical", openmv_settings["flip_vertical"]))
+    openmv_settings["exposure"] = int(payload.get("exposure", openmv_settings["exposure"]))
+    openmv_settings["gain"] = float(payload.get("gain", openmv_settings["gain"]))
+    openmv_settings["auto_white_balance"] = bool(payload.get("auto_white_balance", openmv_settings["auto_white_balance"]))
+    openmv_settings["serial_timeout"] = int(payload.get("serial_timeout", openmv_settings["serial_timeout"]))
     add_log("device", f"更新 OpenMV 配置: {openmv_settings}", current_user.id)
     return jsonify({"ok": True, "settings": openmv_settings})
 
@@ -728,6 +748,9 @@ def admin_overview():
                     "username": u.username,
                     "is_admin": u.is_admin,
                     "status": "启用" if u.is_active_account else "禁用",
+                    "email": u.email,
+                    "phone": u.phone,
+                    "avatar_url": u.avatar_url,
                     "created_at": u.created_at.strftime("%Y-%m-%d %H:%M:%S"),
                     "last_login_at": u.last_login_at.strftime("%Y-%m-%d %H:%M:%S") if u.last_login_at else "-",
                 }
@@ -736,6 +759,7 @@ def admin_overview():
             "metrics": {
                 "user_count": User.query.count(),
                 "history_total": DetectionRecord.query.count(),
+                "history_total_desc": "历史总量=系统中累计保存的检测记录条数",
                 "camera_on": runtime_state["camera_on"],
             "camera_state": runtime_state["camera_state"],
                 "detection_on": runtime_state["detection_on"],
@@ -805,6 +829,137 @@ def update_user_status(user_id: int):
     user.is_active_account = bool(payload.get("is_active", True))
     db.session.commit()
     add_log("admin", f"修改用户状态: {user.username}=>{'启用' if user.is_active_account else '禁用'}", current_user.id)
+    return jsonify({"ok": True})
+
+
+@app.post("/api/admin/users")
+@login_required
+def create_user():
+    if not current_user.is_admin:
+        return jsonify({"ok": False, "message": "forbidden"}), 403
+    payload = request.get_json(silent=True) or {}
+    username = (payload.get("username") or "").strip()
+    password = payload.get("password") or ""
+    if not username or len(password) < 6:
+        return jsonify({"ok": False, "message": "用户名不能为空且密码至少6位"}), 400
+    if User.query.filter_by(username=username).first():
+        return jsonify({"ok": False, "message": "用户名已存在"}), 400
+    user = User(
+        username=username,
+        password_hash=hash_password(password),
+        email=(payload.get("email") or "").strip(),
+        phone=(payload.get("phone") or "").strip(),
+        avatar_url=(payload.get("avatar_url") or "").strip(),
+        is_admin=bool(payload.get("is_admin", False)),
+    )
+    db.session.add(user)
+    db.session.commit()
+    add_log("admin", f"新增用户: {username}", current_user.id)
+    return jsonify({"ok": True})
+
+
+@app.put("/api/admin/users/<int:user_id>")
+@login_required
+def update_user(user_id: int):
+    if not current_user.is_admin:
+        return jsonify({"ok": False, "message": "forbidden"}), 403
+    user = User.query.get_or_404(user_id)
+    payload = request.get_json(silent=True) or {}
+    username = (payload.get("username") or user.username).strip()
+    duplicate = User.query.filter(User.username == username, User.id != user.id).first()
+    if duplicate:
+        return jsonify({"ok": False, "message": "用户名已存在"}), 400
+    user.username = username
+    user.email = (payload.get("email") or "").strip()
+    user.phone = (payload.get("phone") or "").strip()
+    user.avatar_url = (payload.get("avatar_url") or "").strip()
+    user.is_admin = bool(payload.get("is_admin", user.is_admin))
+    user.is_active_account = bool(payload.get("is_active", user.is_active_account))
+    db.session.commit()
+    add_log("admin", f"更新用户信息: {user.username}", current_user.id)
+    return jsonify({"ok": True})
+
+
+@app.delete("/api/admin/users/<int:user_id>")
+@login_required
+def remove_user(user_id: int):
+    if not current_user.is_admin:
+        return jsonify({"ok": False, "message": "forbidden"}), 403
+    user = User.query.get_or_404(user_id)
+    if user.id == current_user.id:
+        return jsonify({"ok": False, "message": "不能删除当前登录管理员"}), 400
+    username = user.username
+    db.session.delete(user)
+    db.session.commit()
+    add_log("admin", f"删除用户: {username}", current_user.id)
+    return jsonify({"ok": True})
+
+
+@app.post("/api/admin/users/<int:user_id>/password")
+@login_required
+def update_user_password(user_id: int):
+    if not current_user.is_admin:
+        return jsonify({"ok": False, "message": "forbidden"}), 403
+    user = User.query.get_or_404(user_id)
+    payload = request.get_json(silent=True) or {}
+    password = payload.get("password") or ""
+    if len(password) < 6:
+        return jsonify({"ok": False, "message": "密码长度至少6位"}), 400
+    user.password_hash = hash_password(password)
+    db.session.commit()
+    add_log("admin", f"管理员修改用户密码: {user.username}", current_user.id)
+    return jsonify({"ok": True})
+
+
+@app.get("/api/account/me")
+@login_required
+def account_me():
+    return jsonify(
+        {
+            "ok": True,
+            "user": {
+                "id": current_user.id,
+                "username": current_user.username,
+                "email": current_user.email,
+                "phone": current_user.phone,
+                "avatar_url": current_user.avatar_url,
+                "is_admin": current_user.is_admin,
+                "created_at": current_user.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            },
+        }
+    )
+
+
+@app.post("/api/account/profile")
+@login_required
+def update_account_profile():
+    payload = request.get_json(silent=True) or {}
+    username = (payload.get("username") or current_user.username).strip()
+    duplicate = User.query.filter(User.username == username, User.id != current_user.id).first()
+    if duplicate:
+        return jsonify({"ok": False, "message": "用户名已存在"}), 400
+    current_user.username = username
+    current_user.email = (payload.get("email") or "").strip()
+    current_user.phone = (payload.get("phone") or "").strip()
+    current_user.avatar_url = (payload.get("avatar_url") or "").strip()
+    db.session.commit()
+    add_log("account", f"用户更新个人信息: {current_user.username}", current_user.id)
+    return jsonify({"ok": True})
+
+
+@app.post("/api/account/password")
+@login_required
+def update_account_password():
+    payload = request.get_json(silent=True) or {}
+    old_password = payload.get("old_password") or ""
+    new_password = payload.get("new_password") or ""
+    if not verify_password(current_user.password_hash, old_password):
+        return jsonify({"ok": False, "message": "旧密码错误"}), 400
+    if len(new_password) < 6:
+        return jsonify({"ok": False, "message": "新密码长度至少6位"}), 400
+    current_user.password_hash = hash_password(new_password)
+    db.session.commit()
+    add_log("account", f"用户修改密码: {current_user.username}", current_user.id)
     return jsonify({"ok": True})
 
 

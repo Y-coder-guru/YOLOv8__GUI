@@ -87,10 +87,14 @@ async function pollDetection() {
 
 async function pollOpenmvFrames() {
   const data = await fetch('/api/openmv/frame').then((r) => r.json()).catch(() => ({ ok: false }));
-  if (!data.ok) return;
+  if (!data.ok) {
+    openmvConnStatus.textContent = `连接状态：未收到视频帧（${data.message || '等待中'}）`;
+    return;
+  }
   lastFrameAt = Date.now();
   openmvImage.src = `data:image/jpeg;base64,${data.frame}`;
-  openmvConnStatus.textContent = `连接状态：已连接 | RX=${data.len} | 帧头=${data.header} 帧尾=${data.footer}`;
+  const target = document.getElementById('openmvTarget').value.trim() || '-';
+  openmvConnStatus.textContent = `连接状态：已连接 | 视频端口：${target} | RX=${data.len} | 帧头=${data.header} 帧尾=${data.footer}`;
 }
 
 cameraType.onchange = () => {
@@ -119,13 +123,15 @@ document.getElementById('connectOpenmvBtn').onclick = async () => {
     showToast('OpenMV 连接失败，请检查串口占用/网络连通性。', 'danger');
     return;
   }
-  openmvConnStatus.textContent = `连接状态：连接中 (${mode} ${target}) 波特率=${baudrate}`;
+  cameraType.value = 'openmv';
+  openmvPanel.classList.remove('d-none');
+  openmvConnStatus.textContent = `连接状态：连接中 (${mode} ${target}) | 视频端口：${target} | 波特率=${baudrate}`;
   showToast('OpenMV 连接成功');
 };
 
 document.getElementById('disconnectOpenmvBtn').onclick = async () => {
   await postApi('/api/openmv/disconnect');
-  openmvConnStatus.textContent = '连接状态：未连接';
+  openmvConnStatus.textContent = '连接状态：未连接 | 视频端口：--';
   showToast('OpenMV 已断开', 'secondary');
 };
 
@@ -139,8 +145,11 @@ document.getElementById('openCameraBtn').onclick = async () => {
     } else {
       video.classList.add('d-none');
       openmvImage.classList.remove('d-none');
+      openmvImage.src = '';
+      openmvConnStatus.textContent = '连接状态：正在拉取视频流...';
       if (frameTimer) clearInterval(frameTimer);
-      frameTimer = setInterval(pollOpenmvFrames, 500);
+      frameTimer = setInterval(pollOpenmvFrames, 350);
+      pollOpenmvFrames();
       lastFrameAt = Date.now();
       setTimeout(async () => {
         if (Date.now() - lastFrameAt >= 5000) {

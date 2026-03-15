@@ -2,11 +2,9 @@ const lineChart = echarts.init(document.getElementById('lineChart'));
 const pieChart = echarts.init(document.getElementById('pieChart'));
 const barChart = echarts.init(document.getElementById('barChart'));
 let allCategories = [];
-let autoCarousel = null;
 
-function selectedCategories() {
-  const select = document.getElementById('categoryFilter');
-  return Array.from(select.selectedOptions).map((o) => o.value);
+function selectedCategory() {
+  return document.getElementById('categoryFilter').value;
 }
 
 function getRangePayload() {
@@ -14,37 +12,20 @@ function getRangePayload() {
     range: document.getElementById('rangeType').value,
     start_time: document.getElementById('startTime').value.replace('T', ' '),
     end_time: document.getElementById('endTime').value.replace('T', ' '),
-    categories: selectedCategories().join(','),
+    categories: selectedCategory(),
   };
-}
-
-function loadAnim(chart) {
-  chart.showLoading('default', { text: '加载中...' });
-}
-
-function stopLoadAnim(chart) {
-  chart.hideLoading();
 }
 
 function applyLine(timeline = []) {
   lineChart.setOption({
-    tooltip: {
-      trigger: 'axis',
-      formatter: (params) => {
-        const p = params[0];
-        const dist = p.data?.dist || {};
-        const distText = Object.entries(dist).map(([k,v]) => `${k}: ${v}`).join('、') || '无';
-        return `时间: ${p.axisValue}<br/>数量: ${p.value}<br/>类别分布: ${distText}`;
-      },
-    },
+    tooltip: { trigger: 'axis' },
     dataZoom: [{ type: 'inside' }, { type: 'slider' }],
     xAxis: { type: 'category', data: timeline.map((x) => x.time) },
     yAxis: { type: 'value' },
     series: [{
       name: '数量', type: 'line', smooth: true,
-      data: timeline.map((x) => ({ value: x.value, dist: x.dist })),
-      symbolSize: 10,
-      emphasis: { scale: 1.4 },
+      data: timeline.map((x) => x.value),
+      symbolSize: 8,
       areaStyle: {
         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
           { offset: 0, color: 'rgba(31,119,255,0.45)' },
@@ -53,47 +34,39 @@ function applyLine(timeline = []) {
       },
       lineStyle: { width: 3, color: '#1f77ff' },
     }],
-    animationDuration: 600,
   });
 }
 
-function applyPie(pie = []) {
+function applyCategoryBars(pie = []) {
+  const sorted = [...pie].sort((a, b) => b.value - a.value);
   pieChart.setOption({
-    tooltip: { formatter: '{b}<br/>占比: {d}%<br/>数量: {c}' },
-    legend: { bottom: 0 },
-    series: [{
-      type: 'pie',
-      radius: ['38%', '72%'],
-      roseType: 'radius',
-      data: pie,
-      selectedMode: 'single',
-      itemStyle: {
-        borderRadius: 10,
-      },
-      emphasis: { scale: true, scaleSize: 8 },
-      animationType: 'scale',
-    }],
-  });
-}
-
-function applyBar(bar = []) {
-  barChart.setOption({
     tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: bar.map((x) => x.name) },
-    yAxis: { type: 'value' },
+    xAxis: { type: 'value' },
+    yAxis: { type: 'category', data: sorted.map((x) => x.name) },
     series: [{
       type: 'bar',
-      data: bar.map((x) => x.value),
-      itemStyle: {
-        borderRadius: [8, 8, 0, 0],
-        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: '#00d2ff' },
-          { offset: 1, color: '#3a7bd5' },
-        ]),
-      },
-      emphasis: { itemStyle: { shadowBlur: 15, shadowColor: 'rgba(0,0,0,0.25)' } },
+      data: sorted.map((x) => x.value),
+      label: { show: true, position: 'right' },
+      itemStyle: { color: '#36a2eb', borderRadius: [0, 8, 8, 0] },
     }],
-    animationDuration: 700,
+  });
+}
+
+function applyRadar(bar = []) {
+  const maxVal = Math.max(5, ...bar.map((x) => x.value));
+  barChart.setOption({
+    tooltip: {},
+    radar: {
+      indicator: bar.map((x) => ({ name: x.name, max: maxVal })),
+      radius: '70%',
+    },
+    series: [{
+      type: 'radar',
+      data: [{ value: bar.map((x) => x.value), name: '类别分布' }],
+      areaStyle: { opacity: 0.25 },
+      lineStyle: { width: 2, color: '#8e44ad' },
+      itemStyle: { color: '#8e44ad' },
+    }],
   });
 }
 
@@ -109,10 +82,8 @@ async function refreshCards() {
 
 async function refreshAdvanced() {
   const q = new URLSearchParams(getRangePayload()).toString();
-  [lineChart, pieChart, barChart].forEach(loadAnim);
   const res = await fetch(`/api/stats/advanced?${q}`);
   const data = await res.json();
-  [lineChart, pieChart, barChart].forEach(stopLoadAnim);
   if (!data.ok) {
     showToast(`数据加载失败：${data.message || '未知错误'}`, 'danger');
     return;
@@ -121,31 +92,12 @@ async function refreshAdvanced() {
   const cate = document.getElementById('categoryFilter');
   if (!allCategories.length) {
     allCategories = data.categories;
-    cate.innerHTML = allCategories.map((x) => `<option value="${x}">${x}</option>`).join('');
+    cate.innerHTML = '<option value="">全部类别</option>' + allCategories.map((x) => `<option value="${x}">${x}</option>`).join('');
   }
 
   applyLine(data.timeline);
-  applyPie(data.pie);
-  applyBar(data.bar);
-}
-
-pieChart.on('click', (params) => {
-  const target = params.name;
-  const select = document.getElementById('categoryFilter');
-  Array.from(select.options).forEach((o) => {
-    o.selected = o.value === target;
-  });
-  refreshAdvanced();
-});
-
-function startCarousel() {
-  if (autoCarousel) clearInterval(autoCarousel);
-  autoCarousel = setInterval(() => {
-    const data = pieChart.getOption().series?.[0]?.data || [];
-    if (!data.length) return;
-    const idx = Math.floor(Math.random() * data.length);
-    pieChart.dispatchAction({ type: 'highlight', seriesIndex: 0, dataIndex: idx });
-  }, 3000);
+  applyCategoryBars(data.pie);
+  applyRadar(data.bar);
 }
 
 document.getElementById('refreshBtn').onclick = async () => {
@@ -177,7 +129,6 @@ document.getElementById('clearDataBtn').onclick = async () => {
 async function init() {
   await refreshCards();
   await refreshAdvanced();
-  startCarousel();
   setInterval(() => {
     refreshCards();
     refreshAdvanced();

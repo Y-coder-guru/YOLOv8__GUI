@@ -40,12 +40,12 @@ async function loadHistory() {
   page = data.page;
   tbody.innerHTML = '';
   if (!data.records.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">暂无数据</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">暂无历史记录，请先进行检测。<br><small>将显示：时间、ID、目标类别、数量、操作人、操作类型</small></td></tr>';
   }
 
   data.records.forEach((r) => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${r.id}</td><td>${r.time}</td><td>${r.category}</td><td>${r.count}</td><td>${r.operator}</td><td>${r.operation_type}</td><td><button class="btn btn-sm btn-outline-primary">详情</button></td>`;
+    tr.innerHTML = `<td>${r.id}</td><td>${r.time}</td><td>${r.category}</td><td>${r.count}</td><td>${r.operator}</td><td>${r.operation_type}</td><td><button class="btn btn-outline-primary uniform-btn">详情</button></td>`;
     tr.querySelector('button').onclick = () => showDetail(r.id);
     tbody.appendChild(tr);
   });
