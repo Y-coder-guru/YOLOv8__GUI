@@ -2,14 +2,25 @@ const userList = document.getElementById('userList');
 const logList = document.getElementById('logList');
 let logOffset = 0;
 const logPageSize = 20;
-let canManageUsers = true;
+
+let canManageUsers = false;
+const userManageSection = document.getElementById('userManageSection');
+
+if (!userList || !logList) {
+  console.warn('admin.js: admin DOM 未就绪，跳过初始化');
+}
 
 async function syncPermission() {
   try {
     const res = await fetch('/api/account/me');
-    if (!res.ok) return;
-    const data = await res.json();
-    canManageUsers = !!data.user?.is_admin;
+
+    if (!res.ok) {
+      canManageUsers = false;
+    } else {
+      const data = await res.json();
+      canManageUsers = !!data.user?.is_admin;
+    }
+
   } catch (e) {
     canManageUsers = false;
   }
@@ -18,18 +29,49 @@ async function syncPermission() {
     createBtn.disabled = !canManageUsers;
     createBtn.title = canManageUsers ? '' : '普通用户无权限执行此操作';
   }
+
+  if (userManageSection) {
+    userManageSection.classList.toggle('d-none', !canManageUsers);
+  }
+}
+
+async function refreshCameraStatus() {
+  const el = document.getElementById('mCamera');
+  if (!el) return;
+  try {
+    const res = await fetch('/api/camera/status');
+    const data = await res.json();
+    const connected = data.ok && data.status === 'connected';
+    el.textContent = connected ? '已连接' : '离线';
+    el.classList.toggle('text-success', connected);
+    el.classList.toggle('text-secondary', !connected);
+  } catch (e) {
+    el.textContent = '离线';
+    el.classList.remove('text-success');
+    el.classList.add('text-secondary');
+  }
+
 }
 
 async function refreshAdmin() {
   const operator = document.getElementById('logOperator').value.trim();
-  const res = await fetch(`/api/admin/overview?offset=${logOffset}&limit=${logPageSize}&operator=${encodeURIComponent(operator)}`);
-  const data = await res.json();
+  let data;
+  try {
+    const res = await fetch(`/api/admin/overview?offset=${logOffset}&limit=${logPageSize}&operator=${encodeURIComponent(operator)}`);
+    if (!res.ok) {
+      showToast('系统设置数据加载失败', 'danger');
+      return;
+    }
+    data = await res.json();
+  } catch (e) {
+    showToast('系统设置数据加载失败', 'danger');
+    return;
+  }
   if (!data.ok) { showToast(data.message || "系统设置数据加载失败", "danger"); return; }
 
   animateNumber(document.getElementById('mUser'), data.metrics.user_count);
   animateNumber(document.getElementById('mHistory'), data.metrics.history_total);
   document.getElementById('mHistoryDesc').textContent = data.metrics.history_total_desc;
-  document.getElementById('mCamera').textContent = data.metrics.camera_state || '未连接';
   animateNumber(document.getElementById('mLogs'), data.metrics.today_logs);
 
   userList.innerHTML = "";
@@ -170,7 +212,13 @@ document.getElementById('nextLogPage').onclick = () => {
   refreshAdmin();
 };
 
-syncPermission();
-refreshAdmin();
-loadCameraConfig();
-setInterval(() => refreshAdmin(), 5000);
+
+if (userList && logList) {
+  syncPermission();
+  refreshCameraStatus();
+  refreshAdmin();
+  loadCameraConfig();
+  setInterval(() => refreshAdmin(), 5000);
+  setInterval(refreshCameraStatus, 3000);
+}
+

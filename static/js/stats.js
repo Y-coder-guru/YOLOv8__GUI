@@ -3,6 +3,23 @@ const pieChart = echarts.init(document.getElementById('pieChart'));
 const barChart = echarts.init(document.getElementById('barChart'));
 let allCategories = [];
 
+async function refreshCameraStatusCard() {
+  const el = document.getElementById('cardCamera');
+  if (!el) return;
+  try {
+    const res = await fetch('/api/camera/status');
+    const data = await res.json();
+    const connected = data.ok && data.status === 'connected';
+    el.textContent = connected ? '已连接' : '离线';
+    el.classList.toggle('text-success', connected);
+    el.classList.toggle('text-secondary', !connected);
+  } catch (e) {
+    el.textContent = '离线';
+    el.classList.remove('text-success');
+    el.classList.add('text-secondary');
+  }
+}
+
 function selectedCategory() {
   return document.getElementById('categoryFilter').value;
 }
@@ -92,7 +109,6 @@ async function refreshCards() {
   animateNumber(document.getElementById('cardEvents'), data.cards.today_events);
   animateNumber(document.getElementById('cardObjects'), data.cards.today_objects);
   animateNumber(document.getElementById('cardUsers'), data.cards.active_users);
-  document.getElementById('cardCamera').textContent = data.cards.camera_state || '未连接';
 }
 
 async function refreshAdvanced() {
@@ -117,6 +133,7 @@ async function refreshAdvanced() {
 
 document.getElementById('refreshBtn').onclick = async () => {
   await refreshCards();
+  await refreshCameraStatusCard();
   await refreshAdvanced();
   showToast('数据已刷新');
 };
@@ -139,11 +156,13 @@ document.getElementById('clearDataBtn').onclick = async () => {
 
 async function init() {
   await refreshCards();
+  await refreshCameraStatusCard();
   await refreshAdvanced();
   setInterval(() => {
     refreshCards();
     refreshAdvanced();
   }, 5000);
+  setInterval(refreshCameraStatusCard, 3000);
 
   setTimeout(() => {
     lineChart.resize();
