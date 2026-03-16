@@ -56,11 +56,17 @@ document.getElementById('changePwdBtn').onclick = async () => {
 };
 
 document.getElementById('reloginBtn').onclick = async () => {
-  window.location.href = '/relogin';
+  if (!confirm('将退出当前会话并返回登录页，是否继续重新登录？')) return;
+  const res = await fetch('/api/auth/relogin', { method: 'POST' });
+  const data = await res.json().catch(() => ({}));
+  window.location.href = data.redirect || '/login';
 };
 
 document.getElementById('logoutBtn').onclick = async () => {
-  window.location.href = '/logout';
+  if (!confirm('确认退出登录？')) return;
+  const res = await fetch('/api/auth/logout', { method: 'POST' });
+  const data = await res.json().catch(() => ({}));
+  window.location.href = data.redirect || '/login';
 };
 
 loadMe();
