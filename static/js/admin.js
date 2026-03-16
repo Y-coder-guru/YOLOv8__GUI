@@ -4,6 +4,7 @@ let logOffset = 0;
 const logPageSize = 20;
 
 let canManageUsers = false;
+let adminLoadFailed = false;
 const userManageSection = document.getElementById('userManageSection');
 
 if (!userList || !logList) {
@@ -41,14 +42,16 @@ async function refreshCameraStatus() {
   try {
     const res = await fetch('/api/camera/status');
     const data = await res.json();
-    const connected = data.ok && data.status === 'connected';
-    el.textContent = connected ? '已连接' : '离线';
-    el.classList.toggle('text-success', connected);
-    el.classList.toggle('text-secondary', !connected);
+    const phase = data.phase || (data.connected ? 'running' : 'offline');
+    el.textContent = data.text || (phase === 'running' ? '已连接' : '离线');
+    el.classList.toggle('status-online', phase === 'running');
+    el.classList.toggle('status-ready', phase === 'ready');
+    el.classList.toggle('status-offline', phase === 'offline');
   } catch (e) {
     el.textContent = '离线';
-    el.classList.remove('text-success');
-    el.classList.add('text-secondary');
+    el.classList.remove('status-online');
+    el.classList.remove('status-ready');
+    el.classList.add('status-offline');
   }
 
 }
@@ -59,15 +62,22 @@ async function refreshAdmin() {
   try {
     const res = await fetch(`/api/admin/overview?offset=${logOffset}&limit=${logPageSize}&operator=${encodeURIComponent(operator)}`);
     if (!res.ok) {
-      showToast('系统设置数据加载失败', 'danger');
+      if (!adminLoadFailed) showToast('系统设置数据加载失败', 'danger');
+      adminLoadFailed = true;
       return;
     }
     data = await res.json();
   } catch (e) {
-    showToast('系统设置数据加载失败', 'danger');
+    if (!adminLoadFailed) showToast('系统设置数据加载失败', 'danger');
+    adminLoadFailed = true;
     return;
   }
-  if (!data.ok) { showToast(data.message || "系统设置数据加载失败", "danger"); return; }
+  if (!data.ok) {
+    if (!adminLoadFailed) showToast(data.message || '系统设置数据加载失败', 'danger');
+    adminLoadFailed = true;
+    return;
+  }
+  adminLoadFailed = false;
 
   animateNumber(document.getElementById('mUser'), data.metrics.user_count);
   animateNumber(document.getElementById('mHistory'), data.metrics.history_total);
@@ -182,10 +192,12 @@ document.getElementById('saveOpenmvCfg').onclick = async () => {
 };
 
 async function loadCameraConfig() {
-  const res = await fetch('/api/system/status');
-  const data = await res.json();
-  if (!data.ok) return;
-  const cfg = data.openmv_settings || {};
+  try {
+    const res = await fetch('/api/system/status');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.ok) return;
+    const cfg = data.openmv_settings || {};
   document.getElementById('cfgCameraType').value = data.camera_type || 'local';
   document.getElementById('cfgCameraId').value = cfg.camera_id ?? 0;
   document.getElementById('cfgRes').value = cfg.resolution || '720P';
@@ -197,6 +209,9 @@ async function loadCameraConfig() {
   document.getElementById('cfgAwb').checked = !!cfg.auto_white_balance;
   document.getElementById('cfgFlipH').checked = !!cfg.flip_horizontal;
   document.getElementById('cfgFlipV').checked = !!cfg.flip_vertical;
+  } catch (e) {
+    console.warn('loadCameraConfig failed', e);
+  }
 }
 
 document.getElementById('logOperator').oninput = () => {
@@ -221,4 +236,3 @@ if (userList && logList) {
   setInterval(() => refreshAdmin(), 5000);
   setInterval(refreshCameraStatus, 3000);
 }
-
