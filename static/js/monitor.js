@@ -100,7 +100,10 @@ async function refreshSystem() {
   const data = await fetch('/api/system/status').then((r) => r.json());
   if (!data.ok) return;
 
-  cameraType.value = data.camera_type || 'local';
+  const remoteType = data.camera_type || 'local';
+  if (data.camera_on || data.openmv_connected) {
+    cameraType.value = remoteType;
+  }
   openmvPanel.classList.toggle('d-none', cameraType.value !== 'openmv');
 
   const isOnline = data.camera_on && data.camera_state !== '未连接';
@@ -237,7 +240,7 @@ document.getElementById('scanPortBtn').onclick = async () => {
 document.getElementById('connectOpenmvBtn').onclick = async () => {
   const mode = document.getElementById('openmvMode').value;
   const target = document.getElementById('openmvTarget').value.trim();
-  const baudrate = Number(document.getElementById('baudrate').value || 115200);
+  const baudrate = Number(document.getElementById('cfgBaudrate').value || 115200);
   await postApi('/api/openmv/settings', { baudrate });
   const data = await postApi('/api/openmv/connect', { mode, target });
   if (!data.ok) {
@@ -247,7 +250,7 @@ document.getElementById('connectOpenmvBtn').onclick = async () => {
   }
   cameraType.value = 'openmv';
   openmvPanel.classList.remove('d-none');
-  openmvConnStatus.textContent = `连接状态：连接中 (${mode} ${target})`;
+  openmvConnStatus.textContent = `连接状态：已连接 (${mode} ${target})`;
   showToast('OpenMV 连接成功');
 };
 

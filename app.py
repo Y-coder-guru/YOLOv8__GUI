@@ -260,6 +260,16 @@ def verify_password(password_hash: str, password: str) -> bool:
     return check_password_hash(password_hash, password)
 
 
+def clear_runtime_after_logout() -> None:
+    if runtime_state["camera_started_at"]:
+        add_duration_seconds(datetime.utcfromtimestamp(runtime_state["camera_started_at"]), datetime.utcnow())
+    runtime_state["camera_on"] = False
+    runtime_state["detection_on"] = False
+    runtime_state["camera_state"] = "未连接"
+    runtime_state["openmv_connected"] = False
+    runtime_state["camera_started_at"] = None
+
+
 def add_log(log_type: str, content: str, user_id: int | None = None, result: str = "成功"):
     """记录系统日志，且避免日志写入异常影响主流程。"""
     operator = "system"
@@ -514,15 +524,10 @@ def register():
 @app.route("/logout")
 @login_required
 def logout():
-    if runtime_state["camera_started_at"]:
-        add_duration_seconds(datetime.utcfromtimestamp(runtime_state["camera_started_at"]), datetime.utcnow())
-    runtime_state["camera_on"] = False
-    runtime_state["detection_on"] = False
-    runtime_state["camera_state"] = "未连接"
-    runtime_state["openmv_connected"] = False
-    runtime_state["camera_started_at"] = None
     add_log("auth", f"用户退出: {current_user.username}", current_user.id)
+    clear_runtime_after_logout()
     logout_user()
+    flash("您已退出登录", "info")
     return redirect(url_for("login"))
 
 
@@ -530,15 +535,10 @@ def logout():
 @login_required
 def relogin():
     if current_user.is_authenticated:
-        if runtime_state["camera_started_at"]:
-            add_duration_seconds(datetime.utcfromtimestamp(runtime_state["camera_started_at"]), datetime.utcnow())
-        runtime_state["camera_on"] = False
-        runtime_state["detection_on"] = False
-        runtime_state["camera_state"] = "未连接"
-        runtime_state["openmv_connected"] = False
-        runtime_state["camera_started_at"] = None
         add_log("auth", f"用户重新登录: {current_user.username}", current_user.id)
+        clear_runtime_after_logout()
         logout_user()
+    flash("请重新登录以继续", "info")
     return redirect(url_for("login"))
 
 
@@ -546,21 +546,18 @@ def relogin():
 @login_required
 def api_logout():
     add_log("auth", f"用户退出: {current_user.username}", current_user.id)
-    if runtime_state["camera_started_at"]:
-        add_duration_seconds(datetime.utcfromtimestamp(runtime_state["camera_started_at"]), datetime.utcnow())
-    runtime_state["camera_on"] = False
-    runtime_state["detection_on"] = False
-    runtime_state["camera_state"] = "未连接"
-    runtime_state["openmv_connected"] = False
-    runtime_state["camera_started_at"] = None
+    clear_runtime_after_logout()
     logout_user()
-    return jsonify({"ok": True, "redirect": url_for("login")})
+    return jsonify({"ok": True, "action": "logout", "redirect": url_for("login")})
 
 
 @app.post("/api/auth/relogin")
 @login_required
 def api_relogin():
-    return api_logout()
+    add_log("auth", f"用户重新登录: {current_user.username}", current_user.id)
+    clear_runtime_after_logout()
+    logout_user()
+    return jsonify({"ok": True, "action": "relogin", "redirect": url_for("login")})
 
 
 @app.route("/profile")
@@ -599,13 +596,22 @@ def admin_page():
 @app.get("/api/camera/status")
 @login_required
 def camera_status():
-    connected = bool(runtime_state["camera_on"] and runtime_state["camera_state"] != "未连接")
+    connected = bool(
+        runtime_state["camera_on"]
+        and (
+            runtime_state["camera_type"] == "local"
+            or runtime_state["openmv_connected"]
+            or runtime_state["camera_state"] != "未连接"
+        )
+    )
     return jsonify(
         {
             "ok": True,
             "status": "connected" if connected else "disconnected",
             "connected": connected,
             "text": "已连接" if connected else "离线",
+            "camera_type": runtime_state["camera_type"],
+            "openmv_connected": runtime_state["openmv_connected"],
         }
     )
 
@@ -666,7 +672,7 @@ def openmv_connect():
             runtime_state["camera_state"] = "未连接"
             return jsonify({"ok": False, "message": f"串口连接失败: {exc}"}), 400
 
-    runtime_state["camera_state"] = "连接中"
+    runtime_state["camera_state"] = "已连接"
     runtime_state["openmv_connected"] = True
     runtime_state["openmv_mode"] = mode
     runtime_state["openmv_target"] = target
@@ -725,7 +731,7 @@ def start_camera():
 
     runtime_state["camera_type"] = camera_type
     runtime_state["camera_on"] = True
-    runtime_state["camera_state"] = "已连接" if camera_type == "local" else "连接中"
+    runtime_state["camera_state"] = "已连接"
     if runtime_state["camera_started_at"] is None:
         runtime_state["camera_started_at"] = time.time()
 
@@ -746,6 +752,7 @@ def stop_camera():
     runtime_state["last_inference_ms"] = 0
     if runtime_state["camera_type"] == "openmv":
         runtime_state["openmv_connected"] = False
+        runtime_state["openmv_target"] = ""
     add_log("device", "摄像头已关闭", current_user.id)
     return jsonify({"ok": True, "camera_on": False})
 
