@@ -42,6 +42,7 @@ async function refreshCameraStatus() {
   try {
     const res = await fetch('/api/camera/status');
     const data = await res.json();
+
     const phase = data.phase || (data.connected ? 'running' : 'offline');
     el.textContent = data.text || (phase === 'running' ? '已连接' : '离线');
     el.classList.toggle('status-online', phase === 'running');
@@ -51,6 +52,7 @@ async function refreshCameraStatus() {
     el.textContent = '离线';
     el.classList.remove('status-online');
     el.classList.remove('status-ready');
+
     el.classList.add('status-offline');
   }
 

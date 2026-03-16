@@ -127,11 +127,13 @@ body {
   background: #e2e8f0;
   border-color: #cbd5e1;
 }
+
 .status-ready {
   color: #92400e;
   background: #fef3c7;
   border-color: #fcd34d;
 }
+
 
 
 .video-wrap { position: relative; background: #0b1220; border-radius: 12px; overflow: hidden; min-height: 420px; }

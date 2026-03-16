@@ -297,6 +297,7 @@ def sync_camera_state() -> bool:
     return connected
 
 
+
 def extract_jpeg_frame(buffer: bytearray) -> bytes:
     start = buffer.find(b"\xff\xd8")
     if start == -1:
@@ -311,6 +312,7 @@ def extract_jpeg_frame(buffer: bytearray) -> bytes:
     frame = bytes(buffer[start : end + 2])
     del buffer[: end + 2]
     return frame
+
 
 
 def add_log(log_type: str, content: str, user_id: int | None = None, result: str = "成功"):
@@ -640,6 +642,7 @@ def admin_page():
 @login_required
 def camera_status():
     connected = sync_camera_state()
+
     if runtime_state["camera_type"] == "openmv":
         if runtime_state["openmv_connected"] and runtime_state["camera_on"]:
             text = "已连接"
@@ -654,13 +657,16 @@ def camera_status():
         text = "已连接" if runtime_state["camera_on"] else "离线"
         phase = "running" if runtime_state["camera_on"] else "offline"
 
+
     return jsonify(
         {
             "ok": True,
             "status": "connected" if connected else "disconnected",
             "connected": connected,
+
             "text": text,
             "phase": phase,
+
             "camera_on": runtime_state["camera_on"],
             "camera_state": runtime_state["camera_state"],
             "camera_type": runtime_state["camera_type"],

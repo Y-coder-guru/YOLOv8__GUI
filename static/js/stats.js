@@ -18,6 +18,7 @@ async function refreshCameraStatusCard() {
     el.textContent = '离线';
     el.classList.remove('status-online');
     el.classList.remove('status-ready');
+
     el.classList.add('status-offline');
   }
 }
