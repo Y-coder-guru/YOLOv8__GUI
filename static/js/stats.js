@@ -9,13 +9,16 @@ async function refreshCameraStatusCard() {
   try {
     const res = await fetch('/api/camera/status');
     const data = await res.json();
-    const connected = data.ok && data.status === 'connected';
-    el.textContent = connected ? '已连接' : '离线';
-    el.classList.toggle('status-online', connected);
-    el.classList.toggle('status-offline', !connected);
+    const phase = data.phase || (data.connected ? 'running' : 'offline');
+    el.textContent = data.text || (phase === 'running' ? '已连接' : '离线');
+    el.classList.toggle('status-online', phase === 'running');
+    el.classList.toggle('status-ready', phase === 'ready');
+    el.classList.toggle('status-offline', phase === 'offline');
   } catch (e) {
     el.textContent = '离线';
     el.classList.remove('status-online');
+    el.classList.remove('status-ready');
+
     el.classList.add('status-offline');
   }
 }

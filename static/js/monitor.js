@@ -145,11 +145,13 @@ async function pollOpenmvFrames() {
   const data = await fetch('/api/openmv/frame').then((r) => r.json()).catch(() => ({ ok: false }));
   if (!data.ok) {
     openmvConnStatus.textContent = `连接状态：未收到视频帧（${data.message || '等待中'}）`;
+    document.getElementById('cameraStateMini').textContent = '离线';
     return;
   }
   openmvImage.src = `data:image/jpeg;base64,${data.frame}`;
   const target = document.getElementById('openmvTarget').value.trim() || '-';
   openmvConnStatus.textContent = `连接状态：已连接 | 视频端口：${target} | RX=${data.len}`;
+  document.getElementById('cameraStateMini').textContent = '在线';
 }
 
 async function ensureCameraPreview(data) {
@@ -209,6 +211,15 @@ function ensureDetectionPolling(enabled) {
 
 cameraType.onchange = () => {
   openmvPanel.classList.toggle('d-none', cameraType.value !== 'openmv');
+};
+
+document.getElementById('openmvMode').onchange = (e) => {
+  const target = document.getElementById('openmvTarget');
+  if (e.target.value === 'network') {
+    target.placeholder = 'http://ip:port/snapshot.jpg 或 192.168.1.10:8080';
+  } else {
+    target.placeholder = '串口号，如 COM3 或 /dev/ttyUSB0';
+  }
 };
 
 document.getElementById('applyCameraCfgBtn').onclick = async () => {

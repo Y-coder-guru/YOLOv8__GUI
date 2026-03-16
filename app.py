@@ -3,10 +3,12 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 
 import time
 import random
 import socket
+import urllib.request
 from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -229,6 +231,9 @@ runtime_state = {
 }
 
 openmv_serial_conn = None
+openmv_network_conn = None
+openmv_serial_buffer = bytearray()
+openmv_network_buffer = bytearray()
 
 openmv_settings = {
     "camera_id": 0,
@@ -290,6 +295,24 @@ def sync_camera_state() -> bool:
     if not connected:
         runtime_state["detection_on"] = False
     return connected
+
+
+
+def extract_jpeg_frame(buffer: bytearray) -> bytes:
+    start = buffer.find(b"\xff\xd8")
+    if start == -1:
+        if len(buffer) > 65536:
+            del buffer[:-2048]
+        return b""
+    end = buffer.find(b"\xff\xd9", start + 2)
+    if end == -1:
+        if start > 0:
+            del buffer[:start]
+        return b""
+    frame = bytes(buffer[start : end + 2])
+    del buffer[: end + 2]
+    return frame
+
 
 
 def add_log(log_type: str, content: str, user_id: int | None = None, result: str = "成功"):
@@ -619,12 +642,31 @@ def admin_page():
 @login_required
 def camera_status():
     connected = sync_camera_state()
+
+    if runtime_state["camera_type"] == "openmv":
+        if runtime_state["openmv_connected"] and runtime_state["camera_on"]:
+            text = "已连接"
+            phase = "running"
+        elif runtime_state["openmv_connected"]:
+            text = "设备已连(待开启)"
+            phase = "ready"
+        else:
+            text = "离线"
+            phase = "offline"
+    else:
+        text = "已连接" if runtime_state["camera_on"] else "离线"
+        phase = "running" if runtime_state["camera_on"] else "offline"
+
+
     return jsonify(
         {
             "ok": True,
             "status": "connected" if connected else "disconnected",
             "connected": connected,
-            "text": "已连接" if connected else "离线",
+
+            "text": text,
+            "phase": phase,
+
             "camera_on": runtime_state["camera_on"],
             "camera_state": runtime_state["camera_state"],
             "camera_type": runtime_state["camera_type"],
@@ -679,8 +721,17 @@ def openmv_connect():
     if not target:
         return jsonify({"ok": False, "message": "请填写串口号或 IP 地址"}), 400
 
-    global openmv_serial_conn
+    global openmv_serial_conn, openmv_network_conn, openmv_serial_buffer, openmv_network_buffer
+    openmv_serial_buffer = bytearray()
+    openmv_network_buffer = bytearray()
+
     if mode == "serial":
+        if openmv_network_conn:
+            try:
+                openmv_network_conn.close()
+            except Exception:
+                pass
+            openmv_network_conn = None
         if not serial:
             return jsonify({"ok": False, "message": "缺少 pyserial 依赖"}), 500
         try:
@@ -689,6 +740,30 @@ def openmv_connect():
             runtime_state["openmv_connected"] = False
             runtime_state["camera_state"] = "未连接"
             return jsonify({"ok": False, "message": f"串口连接失败: {exc}"}), 400
+    elif mode == "network":
+        if openmv_serial_conn:
+            try:
+                openmv_serial_conn.close()
+            except Exception:
+                pass
+            openmv_serial_conn = None
+
+        if target.startswith("http://") or target.startswith("https://"):
+            pass
+        else:
+            match = re.match(r"^([^:]+):(\d+)$", target)
+            if not match:
+                return jsonify({"ok": False, "message": "网络模式目标格式需为 http(s)://... 或 IP:PORT"}), 400
+            host, port_str = match.groups()
+            try:
+                openmv_network_conn = socket.create_connection((host, int(port_str)), timeout=max(openmv_settings["serial_timeout"] / 1000, 0.5))
+                openmv_network_conn.settimeout(max(openmv_settings["serial_timeout"] / 1000, 0.5))
+            except Exception as exc:
+                runtime_state["openmv_connected"] = False
+                runtime_state["camera_state"] = "未连接"
+                return jsonify({"ok": False, "message": f"网络连接失败: {exc}"}), 400
+    else:
+        return jsonify({"ok": False, "message": "不支持的连接方式"}), 400
 
     runtime_state["camera_state"] = "已连接"
     runtime_state["openmv_connected"] = True
@@ -702,13 +777,21 @@ def openmv_connect():
 @app.post("/api/openmv/disconnect")
 @login_required
 def openmv_disconnect():
-    global openmv_serial_conn
+    global openmv_serial_conn, openmv_network_conn, openmv_serial_buffer, openmv_network_buffer
     if openmv_serial_conn:
         try:
             openmv_serial_conn.close()
         except Exception:
             pass
         openmv_serial_conn = None
+    if openmv_network_conn:
+        try:
+            openmv_network_conn.close()
+        except Exception:
+            pass
+        openmv_network_conn = None
+    openmv_serial_buffer = bytearray()
+    openmv_network_buffer = bytearray()
     runtime_state["openmv_connected"] = False
     runtime_state["camera_state"] = "未连接"
     runtime_state["openmv_target"] = ""
@@ -1327,21 +1410,54 @@ def openmv_frame():
     if not runtime_state["camera_on"] or runtime_state["camera_type"] != "openmv":
         return jsonify({"ok": False, "message": "摄像头未开启"}), 400
     frame = b""
-    global openmv_serial_conn
+    global openmv_serial_conn, openmv_network_conn, openmv_serial_buffer, openmv_network_buffer
     if runtime_state["openmv_mode"] == "serial" and openmv_serial_conn and openmv_serial_conn.is_open:
         try:
             raw = openmv_serial_conn.read(8192)
-            start = raw.find(b"\xff\xd8")
-            end = raw.find(b"\xff\xd9")
-            if start != -1 and end != -1 and end > start:
-                frame = raw[start : end + 2]
-        except Exception:
-            frame = b""
+            if raw:
+                openmv_serial_buffer.extend(raw)
+                frame = extract_jpeg_frame(openmv_serial_buffer)
+        except Exception as exc:
+            runtime_state["camera_state"] = "未连接"
+            runtime_state["openmv_connected"] = False
+            return jsonify({"ok": False, "message": f"串口读取失败: {exc}"}), 400
+
+    if runtime_state["openmv_mode"] == "network" and runtime_state["openmv_target"]:
+        target = runtime_state["openmv_target"]
+        try:
+            if target.startswith("http://") or target.startswith("https://"):
+                with urllib.request.urlopen(target, timeout=max(openmv_settings["serial_timeout"] / 1000, 0.5)) as resp:
+                    chunk = resp.read(65536)
+                openmv_network_buffer.extend(chunk)
+                frame = extract_jpeg_frame(openmv_network_buffer)
+                if not frame and b"\xff\xd8" in chunk and b"\xff\xd9" in chunk:
+                    s = chunk.find(b"\xff\xd8")
+                    e = chunk.find(b"\xff\xd9", s + 2)
+                    if e > s:
+                        frame = chunk[s : e + 2]
+            else:
+                if not openmv_network_conn:
+                    host, port_str = target.rsplit(":", 1)
+                    openmv_network_conn = socket.create_connection((host, int(port_str)), timeout=max(openmv_settings["serial_timeout"] / 1000, 0.5))
+                    openmv_network_conn.settimeout(max(openmv_settings["serial_timeout"] / 1000, 0.5))
+                raw = openmv_network_conn.recv(8192)
+                if raw:
+                    openmv_network_buffer.extend(raw)
+                    frame = extract_jpeg_frame(openmv_network_buffer)
+        except Exception as exc:
+            runtime_state["camera_state"] = "未连接"
+            runtime_state["openmv_connected"] = False
+            return jsonify({"ok": False, "message": f"网络视频流读取失败: {exc}"}), 400
+
     if not frame:
-        header = b"\xff\xd8"
-        payload = bytes([random.randint(0, 255) for _ in range(1024)])
-        footer = b"\xff\xd9"
-        frame = header + payload + footer
+        return jsonify(
+            {
+                "ok": False,
+                "message": "未收到有效视频帧，请检查 OpenMV 脚本是否在发送 JPEG 帧，以及目标地址/端口是否正确",
+                "target": runtime_state["openmv_target"],
+                "mode": runtime_state["openmv_mode"],
+            }
+        ), 400
     runtime_state["openmv_last_frame_at"] = datetime.utcnow()
     runtime_state["openmv_last_len"] = len(frame)
     runtime_state["camera_state"] = "已连接"
