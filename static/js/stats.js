@@ -11,12 +11,12 @@ async function refreshCameraStatusCard() {
     const data = await res.json();
     const connected = data.ok && data.status === 'connected';
     el.textContent = connected ? '已连接' : '离线';
-    el.classList.toggle('text-success', connected);
-    el.classList.toggle('text-secondary', !connected);
+    el.classList.toggle('status-online', connected);
+    el.classList.toggle('status-offline', !connected);
   } catch (e) {
     el.textContent = '离线';
-    el.classList.remove('text-success');
-    el.classList.add('text-secondary');
+    el.classList.remove('status-online');
+    el.classList.add('status-offline');
   }
 }
 
