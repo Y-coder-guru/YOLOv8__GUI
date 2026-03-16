@@ -270,6 +270,28 @@ def clear_runtime_after_logout() -> None:
     runtime_state["camera_started_at"] = None
 
 
+def safe_fmt_dt(dt: datetime | None) -> str:
+    if not dt:
+        return "-"
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def is_camera_connected() -> bool:
+    if not runtime_state["camera_on"]:
+        return False
+    if runtime_state["camera_type"] == "openmv":
+        return bool(runtime_state["openmv_connected"])
+    return runtime_state["camera_state"] != "未连接"
+
+
+def sync_camera_state() -> bool:
+    connected = is_camera_connected()
+    runtime_state["camera_state"] = "已连接" if connected else "未连接"
+    if not connected:
+        runtime_state["detection_on"] = False
+    return connected
+
+
 def add_log(log_type: str, content: str, user_id: int | None = None, result: str = "成功"):
     """记录系统日志，且避免日志写入异常影响主流程。"""
     operator = "system"
@@ -596,20 +618,15 @@ def admin_page():
 @app.get("/api/camera/status")
 @login_required
 def camera_status():
-    connected = bool(
-        runtime_state["camera_on"]
-        and (
-            runtime_state["camera_type"] == "local"
-            or runtime_state["openmv_connected"]
-            or runtime_state["camera_state"] != "未连接"
-        )
-    )
+    connected = sync_camera_state()
     return jsonify(
         {
             "ok": True,
             "status": "connected" if connected else "disconnected",
             "connected": connected,
             "text": "已连接" if connected else "离线",
+            "camera_on": runtime_state["camera_on"],
+            "camera_state": runtime_state["camera_state"],
             "camera_type": runtime_state["camera_type"],
             "openmv_connected": runtime_state["openmv_connected"],
         }
@@ -619,6 +636,7 @@ def camera_status():
 @app.get("/api/system/status")
 @login_required
 def system_status():
+    sync_camera_state()
     camera_state = runtime_state["camera_state"] if runtime_state["camera_on"] else "未连接"
     return jsonify(
         {
@@ -694,6 +712,10 @@ def openmv_disconnect():
     runtime_state["openmv_connected"] = False
     runtime_state["camera_state"] = "未连接"
     runtime_state["openmv_target"] = ""
+    if runtime_state["camera_type"] == "openmv":
+        runtime_state["camera_on"] = False
+        runtime_state["detection_on"] = False
+        runtime_state["camera_started_at"] = None
     add_log("device", "OpenMV 已断开", current_user.id)
     return jsonify({"ok": True, "status": "disconnected"})
 
@@ -1066,8 +1088,8 @@ def admin_overview():
                     "email": u.email,
                     "phone": u.phone,
                     "avatar_url": u.avatar_url,
-                    "created_at": u.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-                    "last_login_at": u.last_login_at.strftime("%Y-%m-%d %H:%M:%S") if u.last_login_at else "-",
+                    "created_at": safe_fmt_dt(u.created_at),
+                    "last_login_at": safe_fmt_dt(u.last_login_at),
                 }
                 for u in users
             ],
@@ -1076,7 +1098,7 @@ def admin_overview():
                 "history_total": DetectionRecord.query.count(),
                 "history_total_desc": "累计检测记录=系统中累计保存的检测记录条数",
                 "camera_on": runtime_state["camera_on"],
-            "camera_state": runtime_state["camera_state"],
+                "camera_state": runtime_state["camera_state"],
                 "detection_on": runtime_state["detection_on"],
                 "today_logs": db.session.query(func.count(SystemLog.id))
                 .filter(SystemLog.created_at >= datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0))
@@ -1084,7 +1106,7 @@ def admin_overview():
             },
             "logs": [
                 {
-                    "time": l.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                    "time": safe_fmt_dt(l.created_at),
                     "operator": l.operator,
                     "ip": l.ip,
                     "content": l.content,

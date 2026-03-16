@@ -176,6 +176,7 @@ async function ensureCameraPreview(data) {
         video.srcObject = stream;
       } catch (e) {
         statusText.textContent = '状态：无法恢复本地摄像头画面（请检查权限）';
+        await postApi('/api/camera/stop');
       }
     }
     if (frameTimer) {
@@ -311,3 +312,9 @@ document.getElementById('fullscreenBtn').onclick = async () => {
 setInterval(refreshSystem, 2500);
 refreshSystem();
 renderDurationTick();
+
+window.addEventListener('beforeunload', () => {
+  if (stream) {
+    stream.getTracks().forEach((t) => t.stop());
+  }
+});
