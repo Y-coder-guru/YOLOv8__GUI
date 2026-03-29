@@ -91,3 +91,23 @@ SQLite 文件：`instance/yolo_monitor.db`
 - `GET /api/history` 获取历史记录（支持筛选+分页）
 - `GET /api/admin/overview` 获取管理员总览
 - `DELETE /api/admin/history/<id>` 删除单条历史
+
+## 8. 作业第一版：进制与编码实验台
+新增页面：`/number-lab`（首页 `/` 已跳转到此页面）。
+
+### 已实现
+- 输入两个整数，支持分别以 `2/8/10/16` 进制输入。
+- 输出支持 `2/8/10/16` 进制。
+- 展示每个输入数在固定字长（8/16/32 位）下的：
+  - 真值
+  - 原码
+  - 反码
+  - 补码
+  - 移码
+- 提供 `A+B`、`A-B`、`A×B` 结果。
+- 右侧统计区包含：
+  - 动态柱状图（A、B、A+B、A-B、A×B）
+  - 本地历史记录（LocalStorage）
+
+### 接口
+- `POST /api/number-lab/convert`
