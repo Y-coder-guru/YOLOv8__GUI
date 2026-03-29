@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}进制与编码实验台{% endblock %}
+
+{% block content %}
+<div class="container-fluid number-lab-page">
+  <div class="row g-3 align-items-stretch">
+    <div class="col-12 col-xl-2">
+      <section class="card h-100 p-3 number-lab-panel">
+        <h5 class="mb-3">操作栏</h5>
+        <div class="d-grid gap-2">
+          <button class="btn btn-primary" id="computeBtn">开始计算</button>
+          <button class="btn btn-outline-secondary" id="swapBtn">交换 A / B</button>
+          <button class="btn btn-outline-danger" id="clearBtn">清空</button>
+        </div>
+        <hr>
+        <h6>小提示</h6>
+        <ul class="small text-muted mb-0 ps-3">
+          <li>支持二/八/十/十六进制输入。</li>
+          <li>支持显示真值、原码、反码、补码、移码。</li>
+          <li>位宽目前支持 8 / 16 / 32 位。</li>
+        </ul>
+      </section>
+    </div>
+
+    <div class="col-12 col-xl-6">
+      <section class="card h-100 p-3 number-lab-panel">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <h5 class="mb-0">计算区域</h5>
+          <div class="d-flex gap-2 align-items-center">
+            <label for="bitsSelect" class="small text-muted">位宽</label>
+            <select id="bitsSelect" class="form-select form-select-sm">
+              <option value="8">8 位</option>
+              <option value="16" selected>16 位</option>
+              <option value="32">32 位</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row g-2 mt-2">
+          <div class="col-12 col-md-6">
+            <label class="form-label">数字 A</label>
+            <input id="num1Input" class="form-control" placeholder="例如：-1011、127、0x3F">
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label">A 进制</label>
+            <select id="base1Select" class="form-select">
+              <option value="2">二进制</option>
+              <option value="8">八进制</option>
+              <option value="10" selected>十进制</option>
+              <option value="16">十六进制</option>
+            </select>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label">输出进制</label>
+            <select id="outBaseSelect" class="form-select">
+              <option value="2">二进制</option>
+              <option value="8">八进制</option>
+              <option value="10" selected>十进制</option>
+              <option value="16">十六进制</option>
+            </select>
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">数字 B</label>
+            <input id="num2Input" class="form-control" placeholder="例如：1101、-45、0x1A">
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label">B 进制</label>
+            <select id="base2Select" class="form-select">
+              <option value="2">二进制</option>
+              <option value="8">八进制</option>
+              <option value="10" selected>十进制</option>
+              <option value="16">十六进制</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-responsive mt-3">
+          <table class="table table-sm table-bordered align-middle text-center mb-0" id="codeTable">
+            <thead class="table-light">
+              <tr>
+                <th>对象</th>
+                <th>真值</th>
+                <th>原码</th>
+                <th>反码</th>
+                <th>补码</th>
+                <th>移码</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>A</td><td colspan="5" class="text-muted">等待计算</td></tr>
+              <tr><td>B</td><td colspan="5" class="text-muted">等待计算</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="row g-2 mt-3">
+          <div class="col-12 col-md-4"><div class="result-chip"><span>A + B</span><strong id="sumValue">-</strong></div></div>
+          <div class="col-12 col-md-4"><div class="result-chip"><span>A - B</span><strong id="diffValue">-</strong></div></div>
+          <div class="col-12 col-md-4"><div class="result-chip"><span>A × B</span><strong id="prodValue">-</strong></div></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="col-12 col-xl-4">
+      <section class="card h-100 p-3 number-lab-panel">
+        <h5 class="mb-3">统计区域</h5>
+        <div id="resultChart" style="height: 260px;"></div>
+        <h6 class="mt-3">历史记录（本地缓存）</h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0" id="historyTable">
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>A</th>
+                <th>B</th>
+                <th>输出</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="4" class="text-muted text-center">暂无记录</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/number_lab.js') }}"></script>
+{% endblock %}

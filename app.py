@@ -257,6 +257,72 @@ def to_bjt(dt: datetime) -> datetime:
     return dt + timedelta(hours=8)
 
 
+
+def parse_number_by_base(raw_value: str, base: int) -> int:
+    value = (raw_value or "").strip().lower()
+    if not value:
+        raise ValueError("输入不能为空")
+
+    sign = -1 if value.startswith("-") else 1
+    if value[0] in "+-":
+        value = value[1:]
+    if not value:
+        raise ValueError("数字格式不正确")
+
+    normalized = value
+    if base == 2 and value.startswith("0b"):
+        normalized = value[2:]
+    elif base == 8 and value.startswith("0o"):
+        normalized = value[2:]
+    elif base == 16 and value.startswith("0x"):
+        normalized = value[2:]
+
+    if not normalized:
+        raise ValueError("数字格式不正确")
+
+    return sign * int(normalized, base)
+
+
+def format_int_by_base(number: int, base: int) -> str:
+    if base == 2:
+        return format(number, "b")
+    if base == 8:
+        return format(number, "o")
+    if base == 10:
+        return str(number)
+    if base == 16:
+        return format(number, "X")
+    raise ValueError("不支持的进制")
+
+
+def build_code_payload(number: int, bits: int) -> dict:
+    min_val = -(2 ** (bits - 1))
+    max_val = (2 ** (bits - 1)) - 1
+    if number < min_val or number > max_val:
+        raise ValueError(f"数值 {number} 超出 {bits} 位有符号整数范围 [{min_val}, {max_val}]")
+
+    sign_bit = "1" if number < 0 else "0"
+    magnitude = format(abs(number), f"0{bits - 1}b")
+    original = sign_bit + magnitude
+
+    if number >= 0:
+        ones = original
+        twos_int = number
+    else:
+        ones = "1" + "".join("1" if c == "0" else "0" for c in magnitude)
+        twos_int = (1 << bits) + number
+
+    twos = format(twos_int & ((1 << bits) - 1), f"0{bits}b")
+    biased = format((twos_int ^ (1 << (bits - 1))) & ((1 << bits) - 1), f"0{bits}b")
+
+    return {
+        "true_value": str(number),
+        "original_code": original,
+        "ones_complement": ones,
+        "twos_complement": twos,
+        "biased_code": biased,
+    }
+
 def hash_password(password: str) -> str:
     return generate_password_hash(password)
 
@@ -506,9 +572,12 @@ def shutdown_session_appcontext(exception=None):
 
 @app.route("/")
 def index():
-    if current_user.is_authenticated:
-        return redirect(url_for("monitor"))
-    return redirect(url_for("login"))
+    return redirect(url_for("number_lab_page"))
+
+
+@app.get("/number-lab")
+def number_lab_page():
+    return render_template("number_lab.html")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -603,6 +672,64 @@ def api_relogin():
     clear_runtime_after_logout()
     logout_user()
     return jsonify({"ok": True, "action": "relogin", "redirect": url_for("login")})
+
+
+
+@app.post("/api/number-lab/convert")
+def number_lab_convert():
+    payload = request.get_json(silent=True) or {}
+
+    try:
+        base1 = int(payload.get("base1", 10))
+        base2 = int(payload.get("base2", 10))
+        out_base = int(payload.get("out_base", 10))
+        bits = int(payload.get("bits", 8))
+        num1_raw = str(payload.get("num1", "")).strip()
+        num2_raw = str(payload.get("num2", "")).strip()
+
+        if base1 not in {2, 8, 10, 16} or base2 not in {2, 8, 10, 16} or out_base not in {2, 8, 10, 16}:
+            raise ValueError("进制只支持 2/8/10/16")
+        if bits not in {8, 16, 32}:
+            raise ValueError("位宽只支持 8/16/32")
+
+        n1 = parse_number_by_base(num1_raw, base1)
+        n2 = parse_number_by_base(num2_raw, base2)
+
+        result_sum = n1 + n2
+        result_diff = n1 - n2
+        result_prod = n1 * n2
+
+        data = {
+            "inputs": {
+                "n1": build_code_payload(n1, bits),
+                "n2": build_code_payload(n2, bits),
+            },
+            "results": {
+                "sum": {
+                    "decimal": str(result_sum),
+                    "formatted": format_int_by_base(result_sum, out_base),
+                },
+                "diff": {
+                    "decimal": str(result_diff),
+                    "formatted": format_int_by_base(result_diff, out_base),
+                },
+                "product": {
+                    "decimal": str(result_prod),
+                    "formatted": format_int_by_base(result_prod, out_base),
+                },
+            },
+            "meta": {
+                "bases": {"n1": base1, "n2": base2, "out": out_base},
+                "bits": bits,
+                "submitted_at": bjt_now().strftime("%Y-%m-%d %H:%M:%S"),
+            },
+        }
+        return jsonify({"ok": True, "data": data})
+    except ValueError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    except Exception:
+        app.logger.exception("number_lab_convert failed")
+        return jsonify({"ok": False, "message": "服务异常，请稍后重试"}), 500
 
 
 @app.route("/profile")

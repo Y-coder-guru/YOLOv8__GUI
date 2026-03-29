@@ -248,3 +248,36 @@ body {
   .sidebar .nav-link { flex: 1 1 100%; }
   .topbar-right { justify-content: flex-start; gap: 8px; }
 }
+
+.number-lab-panel {
+  min-height: 100%;
+}
+
+.number-lab-page .form-label {
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.result-chip {
+  border: 1px solid #dbeafe;
+  background: #f8faff;
+  border-radius: 12px;
+  padding: 12px;
+  min-height: 76px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.result-chip span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.result-chip strong {
+  font-size: 16px;
+  color: #1e293b;
+  margin-top: 3px;
+  word-break: break-all;
+}
